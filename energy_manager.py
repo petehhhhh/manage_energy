@@ -20,6 +20,7 @@ class manage_energy ():
         self._host = host
         self._name = host
         self._locked = False
+        self._curtailment = False
         self._mode = "Auto"
         self._id = host.lower()
         self._recorder = get_instance(hass)
@@ -31,6 +32,13 @@ class manage_energy ():
     def hub_id(self) -> str:
         """ID for dummy hub."""
         return self._id
+
+    async def set_solar_curtailment(self, state):
+        self._curtailment = state
+        await self.refresh()
+
+    async def get_solar_curtailment(self):
+        return self._curtailment
 
     async def async_will_remove_from_hass(self):
         if self._unsub_refresh is not None:
@@ -49,7 +57,8 @@ class manage_energy ():
         await self.refresh()
 
     async def refresh_interval(self, now):
-        async_call_later(self._hass, 2, self.refresh_proxy)
+        #    async_call_later(self._hass, 2, self.refresh_proxy)
+        await self.refresh()
 
     async def set_mode(self, mode):
         self._mode = mode
@@ -289,8 +298,11 @@ class manage_energy ():
             "sensor.amber_general_price").attributes["per_kwh"])
         feedin = float(self._hass.states.get(
             "sensor.amber_feed_in_price").attributes["per_kwh"])
-        battery_level = float(self._hass.states.get(
-            "sensor.solaredge_b1_state_of_energy").state)
+        battery_level_state = self._hass.states.get(
+            "sensor.solaredge_b1_state_of_energy")
+        if battery_level_state is None or battery_level_state.state == "unavailable":
+            raise ValueError("Solaredge unavailable")
+        battery_level = float(battery_level_state.state)
         usable = float(self._hass.states.get(
             "sensor.solaredge_b1_available_energy").state)
         max_energy = float(self._hass.states.get(

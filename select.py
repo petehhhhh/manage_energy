@@ -20,6 +20,7 @@ class Select(SelectEntity):
         self._icon = "mdi:menu"
         self._unique_id = f"{self._hub.hub_id}-{self._id}"
         self._available = True
+        self._enabled = True
         self._device_info = {
             "identifiers": {(DOMAIN, self._hub.hub_id)},
             "name": self._hub._name,
@@ -81,9 +82,18 @@ class Select(SelectEntity):
         """Return the list of available options."""
         return self._options
 
+    def set_available(self, available: bool) -> None:
+        """Set availability."""
+        self._available = available
+        self._attributes["available"] = self._available
+        self.async_write_ha_state()
+
     async def async_select_option(self, option: str) -> None:
         """Change the selected option."""
         self._state = option
         self._attributes["state"] = self._state
-        self.async_write_ha_state()
-        await self._hub.set_mode(option)
+        self.set_available(False)
+        try:
+            await self._hub.set_mode(option)
+        finally:
+            self.set_available(True)

@@ -1,4 +1,4 @@
-"""Pete's energy manager integration."""
+"""Pete's energy integration."""
 from __future__ import annotations
 
 from homeassistant.config_entries import ConfigEntry
@@ -8,7 +8,7 @@ from .const import DOMAIN
 
 # List of platforms to support. There should be a matching .py file for each,
 # eg <cover.py> and <sensor.py>
-PLATFORMS: list[str] = ["select", "sensor"]
+PLATFORMS: list[str] = ["select", "switch"]
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
@@ -16,7 +16,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     # Store an instance of the "connecting" class that does the work of speaking
     # with your actual devices.
     hub = manage_energy(hass, entry.data["host"])
-    hass.data.setdefault(DOMAIN, {})[entry.entry_id] = (hub)
+    hass.data.setdefault(DOMAIN, {})[entry.entry_id] = hub
 
     # This creates each HA object for each platform your device requires.
     # It's done by calling the `async_setup_entry` function in each platform module.
