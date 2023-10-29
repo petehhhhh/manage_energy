@@ -1,4 +1,4 @@
-from .const import MIN_MARGIN, BATTERY_DISCHARGE_RATE, CURTAIL_BATTERY_LEVEL, DOMAIN, AUTO, CHARGE, DISCHARGE, MAXIMISE
+from .const import BATTERY_DISCHARGE_RATE, CURTAIL_BATTERY_LEVEL, DOMAIN, AUTO, CHARGE, DISCHARGE, MAXIMISE
 import time
 import logging
 import datetime
@@ -14,24 +14,35 @@ _LOGGER = logging.getLogger(__name__)
 class manage_energy ():
     manufacturer = "Pete"
 
-    def __init__(self, hass: HomeAssistant, host: str) -> None:
+    def __init__(self, hass: HomeAssistant, host: str, poll_frequency: int, minimum_margin: int) -> None:
         self._hass = hass
         self.em_state = self.energy_manager_state(hass)
         self._host = host
         self._name = host
+        self._poll_frequency = int(poll_frequency)
+        self._minimum_margin = float(minimum_margin)/100
+
         self._locked = False
         self._curtailment = False
         self._mode = "Auto"
         self._id = host.lower()
         self._recorder = get_instance(hass)
+        _LOGGER.info("Setting up polling for every " +
+                     str(self._poll_frequency) + " seconds")
+        _LOGGER.info("Minimum margin set to " +
+                     str(int(self._minimum_margin*100)) + " cents")
         self._unsub_refresh = async_track_time_interval(
-            self._hass, self.refresh_interval, datetime.timedelta(seconds=60))
+            self._hass, self.refresh_interval, datetime.timedelta(seconds=self._poll_frequency))
         # self._recorder = get_instance(hass)
 
     @property
     def hub_id(self) -> str:
         """ID for dummy hub."""
         return self._id
+
+    async def stop_poll(self):
+        if self._unsub_refresh is not None:
+            self._unsub_refresh()
 
     async def set_solar_curtailment(self, state):
         self._curtailment = state
@@ -63,10 +74,6 @@ class manage_energy ():
     async def set_mode(self, mode):
         self._mode = mode
         await self.refresh()
-
-    async def test_connection(self) -> bool:
-
-        return True
 
     async def tesla_charging(self, available_power):
         _LOGGER.info("Checking whether to charge Tesla")
@@ -301,7 +308,7 @@ class manage_energy ():
         battery_level_state = self._hass.states.get(
             "sensor.solaredge_b1_state_of_energy")
         if battery_level_state is None or battery_level_state.state == "unavailable":
-            raise ValueError("Solaredge unavailable")
+            raise RuntimeError("Solaredge unavailable")
         battery_level = float(battery_level_state.state)
         usable = float(self._hass.states.get(
             "sensor.solaredge_b1_available_energy").state)
@@ -339,7 +346,7 @@ class manage_energy ():
             end_high_prices = None
             for index, value in enumerate(next5hours):
                 # if this entry is after the start of high prices and it is less than this value less required margin...
-                if (index > start_high_prices) and (value <= (value1 - MIN_MARGIN)):
+                if (index > start_high_prices) and (value <= (value1 - self._minimum_margin)):
                     end_high_prices = index
                     insufficient_margin = False
                     break
@@ -357,7 +364,7 @@ class manage_energy ():
 
         # if we didn't find one then check that the current price is the tail of the peak
         if end_high_prices == None:
-            if feedin >= (next5hours[0] + MIN_MARGIN):
+            if feedin >= (next5hours[0] + self._minimum_margin):
                 insufficient_margin = False
             else:
                 insufficient_margin = True
@@ -393,7 +400,7 @@ class manage_energy ():
                 await self.em_state.update(
                     "Charging battery as not enough solar & battery and prices rising at" + start_str)
 
-            elif price < (max_values[0] - MIN_MARGIN) and battery_at_peak < max_energy and battery_level < 100:
+            elif price < (max_values[0] - self._minimum_margin) and battery_at_peak < max_energy and battery_level < 100:
                 await self.em_state.update("Making sure battery charged for upcoming price spike at " +
                                            start_str + " as insufficent solar to charge to peak")
                 await self.charge_battery()

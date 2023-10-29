@@ -7,10 +7,11 @@ from typing import Any
 import voluptuous as vol
 
 from homeassistant import config_entries, exceptions
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, callback
+from homeassistant.config_entries import ConfigEntry, OptionsFlow
 
-from .const import DOMAIN  # pylint:disable=unused-import
-from .hub import Hub
+
+from .const import DOMAIN, ConfName, ConfDefaultInt
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -41,27 +42,7 @@ async def validate_input(hass: HomeAssistant, data: dict) -> dict[str, Any]:
     if len(data["host"]) < 3:
         raise InvalidHost
 
-    hub = Hub(hass, data["host"])
-    # The dummy hub provides a `test_connection` method to ensure it's working
-    # as expected
-    result = await hub.test_connection()
-    if not result:
-        # If there is an error, raise an exception to notify HA that there was a
-        # problem. The UI will also show there was a problem
-        raise CannotConnect
-
-    # If your PyPI package is not built with async, pass your methods
-    # to the executor:
-    # await hass.async_add_executor_job(
-    #     your_validate_func, data["username"], data["password"]
-    # )
-
-    # If you cannot connect:
-    # throw CannotConnect
-    # If the authentication is wrong:
-    # InvalidAuth
-
-    # Return info that you want to store in the config entry.
+   # Return info that you want to store in the config entry.
     # "Title" is what is displayed to the user for this hub device
     # It is stored internally in HA as part of the device config.
     # See `async_step_user` below for how this is used
@@ -77,6 +58,12 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     # automatically. This example uses PUSH, as the dummy hub will notify HA of
     # changes.
     CONNECTION_CLASS = config_entries.CONN_CLASS_LOCAL_PUSH
+
+    @staticmethod
+    @callback
+    def async_get_options_flow(config_entry: ConfigEntry) -> OptionsFlow:
+        """Create the options flow for SolarEdge Modbus Multi."""
+        return EnergyManagerOptionsFlowHandler(config_entry)
 
     async def async_step_user(self, user_input=None):
         """Handle the initial step."""
@@ -116,3 +103,51 @@ class CannotConnect(exceptions.HomeAssistantError):
 
 class InvalidHost(exceptions.HomeAssistantError):
     """Error to indicate there is an invalid hostname."""
+
+
+class EnergyManagerOptionsFlowHandler(OptionsFlow):
+    """Handle an options flow for SolarEdge Modbus Multi."""
+
+    def __init__(self, config_entry: ConfigEntry):
+        """Initialize options flow."""
+        self.config_entry = config_entry
+
+    async def async_step_init(self, user_input=None):
+        """Handle the initial options flow step."""
+
+        errors = {}
+
+        if user_input is not None:
+            if user_input[ConfName.POLLING_FREQUENCY] < 1:
+                errors[ConfName.POLLING_FREQUENCY] = "invalid_scan_interval"
+            elif user_input[ConfName.POLLING_FREQUENCY] > 86400:
+                errors[ConfName.POLLING_FREQUENCY] = "invalid_scan_interval"
+            elif user_input[ConfName.MINIMUM_MARGIN] < 0:
+                errors[ConfName.MINIMUM_MARGIN] = "invalid_margin"
+            elif user_input[ConfName.MINIMUM_MARGIN] > 100:
+                errors[ConfName.MINIMUM_MARGIN] = "invalid_margin"
+            else:
+                return self.async_create_entry(title="", data=user_input)
+
+        else:
+            user_input = {
+                ConfName.POLLING_FREQUENCY: self.config_entry.options.get(
+                    ConfName.POLLING_FREQUENCY, ConfDefaultInt.POLLING_FREQUENCY),
+                ConfName.MINIMUM_MARGIN: self.config_entry.options.get(
+                    ConfName.MINIMUM_MARGIN, ConfDefaultInt.MINIMUM_MARGIN),
+            }
+        data_schema = vol.Schema(
+            {
+                vol.Optional(
+                    f"{ConfName.POLLING_FREQUENCY}",
+                    default=user_input[ConfName.POLLING_FREQUENCY],
+                ): vol.Coerce(int),
+                vol.Optional(
+                    f"{ConfName.MINIMUM_MARGIN}",
+                    default=user_input[ConfName.MINIMUM_MARGIN],
+                ):  vol.Coerce(int),
+            })
+        return self.async_show_form(
+            step_id="init",
+            data_schema=data_schema, errors=errors
+        )
