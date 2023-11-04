@@ -2,7 +2,7 @@
   "config": {
     "step": {
       "user": {
-        "title": "Energy Manager",
+        "title": "Manage Energy",
         "data": {
           "host": "Name of Instance",
           "username": "[%key:common::config_flow::data::username%]",
@@ -24,7 +24,8 @@
       "init": {
         "data": {
           "polling_frequency": "Polling Frequency (seconds)",
-          "minimum_margin": "Minimum Marginin in cents"
+          "minimum_margin": "Minimum Marginin in cents",
+          "cheap_price": "Price to start charging Tesla when cheap (in cents)"
         }
       }
     },

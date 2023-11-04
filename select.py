@@ -1,14 +1,16 @@
-from .const import DOMAIN, SELECT_OPTIONS
+from .const import DOMAIN, PowerSelectOptions, TeslaModeSelectOptions
 from homeassistant.components.select import SelectEntity
 from .energy_manager import manage_energy
 
 
 async def async_setup_entry(hass, config_entry, async_add_entities):
     hub = hass.data[DOMAIN][config_entry.entry_id]
-    async_add_entities([Select("PowerMode", "Power Mode", hub)])
+    name = config_entry.data["host"]
+    async_add_entities([PowerModeSelect(name + "_PowerMode", config_entry.title + " Power Mode", hub),
+                        TeslaModeSelect(name + " _TeslaMode", config_entry.title + " Tesla Mode", hub)])
 
 
-class Select(SelectEntity):
+class BaseSelect(SelectEntity):
     # define a select entity
     def __init__(self, select_id: str, name: str, hub) -> None:
         """Initialize a select entity."""
@@ -16,25 +18,24 @@ class Select(SelectEntity):
         self._name = name
         self._hub = hub
         self._state = None
-        self._options = SELECT_OPTIONS
         self._icon = "mdi:menu"
         self._unique_id = f"{self._hub.hub_id}-{self._id}"
         self._available = True
         self._enabled = True
+        self._state = self._options[0]
+        self._attr_options = list(self._options)
         self._device_info = {
             "identifiers": {(DOMAIN, self._hub.hub_id)},
-            "name": self._hub._name,
-            "manufacturer": self._hub.manufacturer,
+            "name": self._hub.name,
+            "manufacturer": hub.manufacturer,
             "model": "Energy Manager",
         }
         self._attributes = {
             "friendly_name": self._name,
             "icon": self._icon,
-            "options": self._options,
             "unique_id": self._unique_id,
         }
-        self._state = self._options[0]
-        self._attributes["options"] = self._options
+
         self._attributes["icon"] = self._icon
         self._attributes["friendly_name"] = self._name
         self._attributes["unique_id"] = self._unique_id
@@ -78,15 +79,45 @@ class Select(SelectEntity):
         return self._attributes
 
     @property
+    def config_entry_id(self):
+        return self._config_entry.entry_id
+
+    @property
+    def config_entry_name(self):
+        return self._config_entry.data["name"]
+
+    @property
     def options(self) -> list:
         """Return the list of available options."""
         return self._options
 
-    def set_available(self, available: bool) -> None:
-        """Set availability."""
-        self._available = available
-        self._attributes["available"] = self._available
-        self.async_write_ha_state()
+
+class TeslaModeSelect(BaseSelect):
+    def __init__(self, select_id: str, name: str, hub) -> None:
+        """Initialize a select entity."""
+
+        self._options = [option.value for option in TeslaModeSelectOptions]
+
+        super().__init__(select_id, name, hub)
+
+    async def async_select_option(self, option: str) -> None:
+        """Change the selected option."""
+        self._state = option
+
+        self._attributes["state"] = self._state
+        self.set_available(False)
+        try:
+            await self._hub.set_mode(option)
+        finally:
+            self.set_available(True)
+
+
+class PowerModeSelect(BaseSelect):
+    def __init__(self, select_id: str, name: str, hub) -> None:
+        """Initialize a select entity."""
+
+        self._options = [option.value for option in PowerSelectOptions]
+        super().__init__(select_id, name, hub)
 
     async def async_select_option(self, option: str) -> None:
         """Change the selected option."""
@@ -94,6 +125,6 @@ class Select(SelectEntity):
         self._attributes["state"] = self._state
         self.set_available(False)
         try:
-            await self._hub.set_mode(option)
+            await self._hub.set_tesla_mode(option)
         finally:
             self.set_available(True)

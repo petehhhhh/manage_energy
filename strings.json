@@ -4,9 +4,7 @@
       "user": {
         "title": "Energy Manager",
         "data": {
-          "host": "Name of Instance",
-          "username": "[%key:common::config_flow::data::username%]",
-          "password": "[%key:common::config_flow::data::password%]"
+          "host": "Name of Instance"
         }
       }
     },
@@ -24,7 +22,8 @@
       "init": {
         "data": {
           "polling_frequency": "Polling Frequency (seconds)",
-          "minimum_margin": "Minimum Marginin in cents"
+          "minimum_margin": "Minimum Marginin in cents",
+          "cheap price": "Price to start charging Tesla when cheap (in cents)"
         }
       }
     },

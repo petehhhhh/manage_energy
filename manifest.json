@@ -1,6 +1,6 @@
 {
-  "domain": "energy_manager",
-  "name": "Energy Manager",
+  "domain": "manage_energy",
+  "name": "Manage Energy",
   "codeowners": ["@petehhhhhh"],
   "config_flow": true,
   "dependencies": [],

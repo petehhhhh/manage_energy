@@ -11,7 +11,7 @@ from homeassistant.core import HomeAssistant, callback
 from homeassistant.config_entries import ConfigEntry, OptionsFlow
 
 
-from .const import DOMAIN, ConfName, ConfDefaultInt
+from .const import DOMAIN, ConfName, ConfDefaultInt, HOST_DEFAULT
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -26,7 +26,10 @@ _LOGGER = logging.getLogger(__name__)
 # quite work as documented and always gave me the "Lokalise key references" string
 # (in square brackets), rather than the actual translated value. I did not attempt to
 # figure this out or look further into it.
-DATA_SCHEMA = vol.Schema({("host"): str})
+# DATA_SCHEMA = vol.Schema({("host"): str}, default=HOST_DEFAULT)
+
+DATA_SCHEMA = vol.Schema(
+    {vol.Required(f"{ConfName.HOST}", default=HOST_DEFAULT): str})
 
 
 async def validate_input(hass: HomeAssistant, data: dict) -> dict[str, Any]:
@@ -46,7 +49,9 @@ async def validate_input(hass: HomeAssistant, data: dict) -> dict[str, Any]:
     # "Title" is what is displayed to the user for this hub device
     # It is stored internally in HA as part of the device config.
     # See `async_step_user` below for how this is used
-    return {"title": data["host"]}
+    title = data["host"]
+
+    return {"title": title}
 
 
 class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
@@ -77,7 +82,12 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         if user_input is not None:
             try:
                 info = await validate_input(self.hass, user_input)
-
+                host = user_input["host"]
+                host = host.replace(".", "_")
+                host = host.replace(" ", "_")
+                host = host.replace("-", "_")
+                host = host.replace(":", "_")
+            #    user_input["host"] = host
                 return self.async_create_entry(title=info["title"], data=user_input)
             except CannotConnect:
                 errors["base"] = "cannot_connect"
@@ -107,6 +117,7 @@ class InvalidHost(exceptions.HomeAssistantError):
 
 class EnergyManagerOptionsFlowHandler(OptionsFlow):
     """Handle an options flow for SolarEdge Modbus Multi."""
+    # when changing, change strings.json remember to copy to transalations and to refresh cache in safari cmd+R
 
     def __init__(self, config_entry: ConfigEntry):
         """Initialize options flow."""
@@ -135,6 +146,8 @@ class EnergyManagerOptionsFlowHandler(OptionsFlow):
                     ConfName.POLLING_FREQUENCY, ConfDefaultInt.POLLING_FREQUENCY),
                 ConfName.MINIMUM_MARGIN: self.config_entry.options.get(
                     ConfName.MINIMUM_MARGIN, ConfDefaultInt.MINIMUM_MARGIN),
+                ConfName.CHEAP_PRICE: self.config_entry.options.get(
+                    ConfName.CHEAP_PRICE, ConfDefaultInt.CHEAP_PRICE),
             }
         data_schema = vol.Schema(
             {
@@ -145,6 +158,10 @@ class EnergyManagerOptionsFlowHandler(OptionsFlow):
                 vol.Optional(
                     f"{ConfName.MINIMUM_MARGIN}",
                     default=user_input[ConfName.MINIMUM_MARGIN],
+                ):  vol.Coerce(int),
+                vol.Optional(
+                    f"{ConfName.CHEAP_PRICE}",
+                    default=user_input[ConfName.CHEAP_PRICE],
                 ):  vol.Coerce(int),
             })
         return self.async_show_form(

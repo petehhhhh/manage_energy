@@ -8,7 +8,7 @@ from .const import DOMAIN, ConfName, ConfDefaultInt
 
 # List of platforms to support. There should be a matching .py file for each,
 # eg <cover.py> and <sensor.py>
-PLATFORMS: list[str] = ["select", "switch"]
+PLATFORMS: list[str] = ["select", "switch", "sensor"]
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
@@ -20,9 +20,13 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         ConfName.POLLING_FREQUENCY, ConfDefaultInt.POLLING_FREQUENCY)
     minimum_margin = entry.options.get(
         ConfName.MINIMUM_MARGIN, ConfDefaultInt.MINIMUM_MARGIN)
-
+    cheap_price = entry.options.get(
+        ConfName.MINIMUM_MARGIN, ConfDefaultInt.CHEAP_PRICE)
+    # ensure hass.data is a dictionary...
+    if DOMAIN not in hass.data:
+        hass.data[DOMAIN] = {}
     hub = manage_energy(
-        hass, entry.data["host"], poll_frequency, minimum_margin)
+        hass, entry.data["host"], poll_frequency, minimum_margin, cheap_price)
     hass.data.setdefault(DOMAIN, {})[entry.entry_id] = hub
 
     # This creates each HA object for each platform your device requires.
@@ -36,7 +40,8 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Unload a config entry."""
     # This is called when an entry/configured device is to be removed. The class
     # needs to unload itself, and remove callbacks. See the classes for further
-    # details
+    # details. Also is called when updating the config entry, so needs to handle
+    # reloading itself in that case.
 
     hub = hass.data.setdefault(DOMAIN, {})[entry.entry_id]
     await hub.stop_poll()

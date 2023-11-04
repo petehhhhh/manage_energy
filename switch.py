@@ -7,20 +7,21 @@ from .const import DOMAIN
 
 async def async_setup_entry(hass, config_entry, async_add_entities):
     hub = hass.data[DOMAIN][config_entry.entry_id]
+    name = config_entry.data["host"]
     async_add_entities([SolarCurtailmentSwitch(
-        "SolarCurtailment", hub)])
+        name + "_SolarCurtailment", config_entry.title + " Solar Curtailmet", hub)])
 
 
 class SolarCurtailmentSwitch(SwitchEntity):
     """Representation of a switch for solar curtailment."""
     type = "solar curtailmen"
 
-    def __init__(self, name, hub):
+    def __init__(self, name, title, hub):
 
         self._id = name
         self._state = False
         self._hub = hub
-        self._name = "Solar Curtailment"
+        self._name = title
         self._icon = "mdi:power-plug"
         self._available = True
         self._unique_id = f"{self._hub.hub_id}-{self._id}"
