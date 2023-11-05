@@ -161,6 +161,7 @@ class Forecasts():
             self.solar = solar_forecast
         self.net = [s - c for s, c in zip(self.solar, self.consumption)]
         self.battery, self.export = self.forecast_battery_and_exports()
+        self.store_history()
 
     def format_date(self, std1):
         format_string = "%Y-%m-%dT%H:%M:%S%z"
