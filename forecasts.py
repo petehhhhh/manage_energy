@@ -144,7 +144,7 @@ class Forecasts():
                 history.pop()
 
         history.append({"start_time": self.start_time[0], "amber": self.amber[0], "solar": self.solar[0],
-                       "consumption": self.consumption[0], "net": self.net[0], "battery": self.battery[0], "export": self.export[0]})
+                       "consumption": self.consumption[0], "net": self.net[0], "battery": self.battery[0], "export": self.export[0], "actual_consumption": self.power_consumption, "actual_solar": self.solar_generation, "actual_battery": self.battery_level, "actual_export": self.feedin, "actual_net": self.power_consumption - self.solar_generation})
         # keep the last 24 hours of history
         history = history[-24:]
         self._hass.states.async_set(
