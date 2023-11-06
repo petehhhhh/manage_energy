@@ -146,9 +146,16 @@ class Forecasts():
                 # remove the last record and replace with the new one
                 history.pop()
 
-        history.append({"start_time": self.start_time[0], "amber": self.amber[0], "solar": self.solar[0],
-                       "consumption": self.consumption[0], "net": self.net[0], "battery": int(self.battery[0] / self.battery_max_energy*100), "export": self.export[0], "actual_consumption": self.actual_consumption, "actual_solar": self.actual_solar, "actual_battery": self.actual_battery_pct_level, "actual_export": self.actual_feedin, "actual_net": self.actual_consumption - self.actual_solar})
-        # keep the last 24 hours of history
+        history.append({"start_time": self.start_time[6], "amber": self.amber[6], "solar": self.solar[6],
+                       "consumption": self.consumption[6], "net": self.net[6], "battery": int(self.battery[6] / self.battery_max_energy*100),
+                        "export": self.export[6]})
+        # search for start_time in history and store actuals for that time - effectively stores the actuals versus forecast generated 3 hours ago
+        for index, value in enumerate(history):
+            if self.compare_datetimes(value["start_time"], self.start_time[0]):
+                history[index].update({"actual_consumption": self.actual_consumption, "actual_solar": self.actual_solar, "actual_battery": self.actual_battery_pct_level,
+                                       "actual_export": self.actual_feedin, "actual_net": self.actual_consumption - self.actual_solar})
+                break
+
         history = history[-24:]
         self._hass.states.async_set(
             "manage_energy.forecast_history", len(history), {"history": history})
