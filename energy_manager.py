@@ -326,7 +326,7 @@ class manage_energy ():
             # if we didn't find one then check that the current price is the tail of the peak
             available_max_values = None
             if end_high_prices == None:
-                if forecasts.feedin >= (next5hours[0] + self._minimum_margin):
+                if forecasts.actual_feedin >= (next5hours[0] + self._minimum_margin):
                     insufficient_margin = False
                 else:
                     insufficient_margin = True
@@ -357,16 +357,16 @@ class manage_energy ():
             tesla_charging = await self.tesla_charging(available_power)
         # Now we can now make a decision if we start to feed in...
             if await self.auto_mode():
-                if discharge_blocks_available > 0 and available_max_values != None and (forecasts.feedin >= min(available_max_values) and not insufficient_margin):
+                if discharge_blocks_available > 0 and available_max_values != None and (forecasts.actual_feedin >= min(available_max_values) and not insufficient_margin):
                     await self.update_status("Discharging battery into Price Spike")
                     await self.discharge_battery()
 
-                elif forecasts.feedin * 1.2 < max(next5hours[0:5]) and forecasts.feedin <= min(next5hours[0:5]) and forecasts.battery_level[start_high_prices] < forecasts.max_battery_energy and forecasts.battery_level < 100:
+                elif forecasts.actual_feedin * 1.2 < max(next5hours[0:5]) and forecasts.actual_feedin <= min(next5hours[0:5]) and forecasts.actual_battery_pct_level[start_high_prices] < forecasts.battery_max_energy and forecasts.actual_battery_pct_level < 100:
                     await self.charge_battery()
                     await self.update_status(
                         "Charging battery as not enough solar & battery and prices rising at" + start_str)
 
-                elif forecasts.price < (max_values[0] - self._minimum_margin) and battery_at_peak < forecasts.max_battery_energy and forecasts.battery_level < 100:
+                elif forecasts.actual_price < (max_values[0] - self._minimum_margin) and battery_at_peak < forecasts.battery_max_energy and forecasts.actual_battery_pct_level < 100:
                     await self.update_status("Making sure battery charged for upcoming price spike at " +
                                              start_str + " as insufficent solar to charge to peak")
                     await self.charge_battery()
@@ -385,7 +385,7 @@ class manage_energy ():
                                 "Maximising current usage. No useful peak in next 5 hours")
                         await self.maximise_self()
 
-            if (not tesla_charging and forecasts.battery_level >= CURTAIL_BATTERY_LEVEL and forecasts.feedin < 0) or self._curtailment:
+            if (not tesla_charging and forecasts.actual_battery_pct_level >= CURTAIL_BATTERY_LEVEL and forecasts.actual_feedin < 0) or self._curtailment:
                 await self.curtail_solar()
                 await self.update_status("Curtailing solar")
             else:
