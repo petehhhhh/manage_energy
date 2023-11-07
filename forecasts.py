@@ -142,7 +142,7 @@ class Forecasts():
         # check if have history record for this start time before adding it
         if len(history) > 0:
 
-            if self.compare_datetimes(self.start_time[0], history[-1]["start_time"]):
+            if self.compare_datetimes(self.start_time[6], history[-1]["start_time"]):
                 # remove the last record and replace with the new one
                 history.pop()
 
