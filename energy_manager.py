@@ -29,7 +29,6 @@ class manage_energy ():
         self._poll_frequency = int(poll_frequency)
         self._minimum_margin = float(minimum_margin)/100
         self._cheap_price = cheap_price/100
-        self._price = 0
         self.manufacturer = "Pete"
         self._locked = False
         self._curtailment = False
@@ -45,6 +44,9 @@ class manage_energy ():
             self._hass, self.refresh_interval, datetime.timedelta(seconds=self._poll_frequency))
 
         self.handle_manage_energy()
+
+    def set_cheap_price(self, value):
+        self._cheap_price = value/100
 
     def add_listener(self, callback):
         """Add a listener that will be notified when the state changes."""
@@ -84,6 +86,15 @@ class manage_energy ():
     @property
     def name(self) -> str:
         return self._name
+
+    async def update_poll_frequency(self, frequency):
+
+        if self._unsub_refresh is not None:
+            self._unsub_refresh()
+
+        self._poll_frequency = frequency
+        self._unsub_refresh = async_track_time_interval(
+            self._hass, self.refresh_interval, datetime.timedelta(seconds=self._poll_frequency))
 
     async def stop_poll(self):
         if self._unsub_refresh is not None:
@@ -141,37 +152,40 @@ class manage_energy ():
         tesla_charger_door_closed = (self._hass.states.get(
             "cover.pete_s_tesla_charger_door").state == 'closed')
 
-        if self._tesla_mode == TeslaModeSelectOptions.FAST_GRID or (self._price <= self._cheap_price and self._tesla_mode == TeslaModeSelectOptions.CHEAP_GRID):
+        if self._tesla_mode == TeslaModeSelectOptions.FAST_GRID or (self.forecasts.actual_price <= self._cheap_price and self._tesla_mode == TeslaModeSelectOptions.CHEAP_GRID):
             charge_amps = 16
         else:
             charge_amps = round(available_power*1000 / 240 / 3, 0)
 
-        if tesla_plugged_in and not tesla_charger_door_closed and tesla_home and charge_limit > current_charge and charge_amps > 0:
-            self._hass.services.call('number', 'set_value', {
-                'entity_id': ' number.pete_s_tesla_charging_amps', 'value': charge_amps}, True)
-            self._hass.services.call('switch', 'turn_on', {
-                'entity_id': 'switch.pete_s_tesla_charger'}, True)
-            self.update_status("Charging Tesla at " +
-                               str(charge_amps) + " amps")
-            return True
-        else:
-            if tesla_home and tesla_plugged_in and tesla_charger_door_closed:
-                if charge_amps <= 0:
-                    self.update_status(
-                        "Tesla home and plugged in but no available power. Turning off charging")
-                else:
-                    if tesla_home and not tesla_charger_door_closed and tesla_plugged_in and charge_limit > current_charge:
-                        self.update_status(
-                            "Tesla home and plugged in but charge limit reached. Turning off charging")
-                    else:
-                        _LOGGER.info(
-                            "Tesla not plugged in. Turning off charging")
+        if tesla_plugged_in and not tesla_charger_door_closed and tesla_home:
 
+            if charge_limit > current_charge and charge_amps > 0:
+                await self._hass.services.async_call('number', 'set_value', {
+                    'entity_id': ' number.pete_s_tesla_charging_amps', 'value': charge_amps}, True)
+                await self._hass.services.async_call('switch', 'turn_on', {
+                    'entity_id': 'switch.pete_s_tesla_charger'}, True)
+                await self.update_status("Charging Tesla at " +
+                                         str(charge_amps) + " amps")
+                return True
+            else:
+
+                if charge_limit <= current_charge:
+                    await self.update_status(
+                        "Tesla home and plugged in but charge limit reached.")
+                elif (self.forecasts.actual_price > self._cheap_price and self._tesla_mode == TeslaModeSelectOptions.CHEAP_GRID):
+                    await self.update_status(
+                        "Tesla home and plugged in but grid price over maximum price of " + str(self._cheap_price) + " cents.")
+                else:
+                    await self.update_status(
+                        "Tesla home and plugged in but Auto mode and no excess power available.")
+                await self.update_status(
+                    "Turning off charging.")
                 await self._hass.services.async_call('switch', 'turn_off', {
                     'entity_id': 'switch.pete_s_tesla_charger'}, True)
                 await self._hass.services.async_call('number', 'set_value', {
                     'entity_id': ' number.pete_s_tesla_charging_amps', 'value': 16}, True)
-            return False
+
+        return False
 
     async def discharge_battery(self):
 
@@ -217,7 +231,7 @@ class manage_energy ():
 
     async def charge_from_solar(self):
 
-        _LOGGER.info("Charging battery")
+        _LOGGER.info("Charging battery from Solar")
         await self._hass.services.async_call('select', 'select_option', {
             'entity_id': 'select.solaredge_i1_storage_control_mode',
             'option': 'Remote Control'}, True)
@@ -282,8 +296,8 @@ class manage_energy ():
         try:
             self.clear_status()
             _LOGGER.info("Running manage_energy")
-
-            forecasts = Forecasts(self._hass)
+            self.forecasts = Forecasts(self._hass)
+            forecasts = self.forecasts
             await forecasts.build()
 
             next5hours = forecasts.amber[0:10]
@@ -347,7 +361,7 @@ class manage_energy ():
                         discharge_blocks_available)]
 
         # estimate how much solar power we will have at time of peak power
-            battery_at_peak = forecasts.battery[start_high_prices]
+            battery_at_peak = forecasts.battery_energy[start_high_prices]
             start_str = ""
             if start_high_prices != None:
                 start_time = forecasts.start_time[start_high_prices]
@@ -361,7 +375,7 @@ class manage_energy ():
                     await self.update_status("Discharging battery into Price Spike")
                     await self.discharge_battery()
 
-                elif forecasts.actual_feedin * 1.2 < max(next5hours[0:5]) and forecasts.actual_feedin <= min(next5hours[0:5]) and forecasts.actual_battery_pct_level[start_high_prices] < forecasts.battery_max_energy and forecasts.actual_battery_pct_level < 100:
+                elif forecasts.actual_feedin * 1.2 < max(next5hours[0:5]) and forecasts.actual_feedin <= min(next5hours[0:5]) and forecasts.battery_energy[start_high_prices] < forecasts.battery_max_energy and forecasts.actual_battery_pct_level < 100:
                     await self.charge_battery()
                     await self.update_status(
                         "Charging battery as not enough solar & battery and prices rising at" + start_str)

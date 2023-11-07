@@ -54,4 +54,11 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
 async def async_reload_entry(hass: HomeAssistant, entry: ConfigEntry) -> None:
     """Handle an options update."""
-    await hass.config_entries.async_reload(entry.entry_id)
+    # await hass.config_entries.async_reload(entry.entry_id)
+    hub = hass.data.setdefault(DOMAIN, {})[entry.entry_id]
+    await hub.update_poll_frequency(entry.options.get(ConfName.POLLING_FREQUENCY, ConfDefaultInt.POLLING_FREQUENCY))
+
+    hub.minimum_margin = entry.options.get(
+        ConfName.MINIMUM_MARGIN, ConfDefaultInt.MINIMUM_MARGIN)
+    hub.set_cheap_price(entry.options.get(
+        ConfName.CHEAP_PRICE, ConfDefaultInt.CHEAP_PRICE))

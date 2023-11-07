@@ -91,6 +91,11 @@ class BaseSelect(SelectEntity):
         """Return the list of available options."""
         return self._options
 
+    def set_available(self, available: bool) -> None:
+        """Set availability."""
+        self._available = available
+        self.async_write_ha_state()
+
 
 class TeslaModeSelect(BaseSelect):
     def __init__(self, select_id: str, name: str, hub) -> None:
@@ -107,7 +112,7 @@ class TeslaModeSelect(BaseSelect):
         self._attributes["state"] = self._state
         self.set_available(False)
         try:
-            await self._hub.set_mode(option)
+            await self._hub.set_tesla_mode(option)
         finally:
             self.set_available(True)
 

@@ -32,7 +32,7 @@ class Forecasts():
         self.solar = []
         self.consumption = []
         self.net = []
-        self.battery = []
+        self.battery_energy = []
         self.export = []
         self.forecast_data = self._hass.states.get(
             "sensor.amber_feed_in_forecast")
@@ -133,8 +133,10 @@ class Forecasts():
 
     def store_history(self):
         # store the forecast history and the actuals in a sensor
-        history = self._hass.states.get("manage_energy.forecast_history")
-        if history is None:
+
+        history = self._hass.states.get(
+            "sensor.manage_energy_history")
+        if not hasattr(history, "history") or history.attributes["history"] == None:
             history = []
         else:
             history = history.attributes["history"]
@@ -147,7 +149,7 @@ class Forecasts():
                 history.pop()
 
         history.append({"start_time": self.start_time[6], "amber": self.amber[6], "solar": self.solar[6],
-                       "consumption": self.consumption[6], "net": self.net[6], "battery": int(self.battery[6] / self.battery_max_energy*100),
+                       "consumption": self.consumption[6], "net": self.net[6], "battery": int(self.battery_energy[6] / self.battery_max_energy*100),
                         "export": self.export[6]})
         # search for start_time in history and store actuals for that time - effectively stores the actuals versus forecast generated 3 hours ago
         for index, value in enumerate(history):
@@ -158,7 +160,7 @@ class Forecasts():
 
         history = history[-24:]
         self._hass.states.async_set(
-            "manage_energy.forecast_history", len(history), {"history": history})
+            "sensor.manage_energy_history", len(history), {"history": history})
 
     async def build(self):
 
@@ -170,7 +172,7 @@ class Forecasts():
         else:
             self.solar = solar_forecast
         self.net = [s - c for s, c in zip(self.solar, self.consumption)]
-        self.battery, self.export = self.forecast_battery_and_exports()
+        self.battery_energy, self.export = self.forecast_battery_and_exports()
         self.store_history()
 
     def format_date(self, std1):
