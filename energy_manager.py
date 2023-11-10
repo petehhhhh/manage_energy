@@ -309,6 +309,10 @@ class manage_energy ():
             max_values = sorted(next5hours, reverse=True)[
                 :(discharge_blocks_available)]
 
+            # get rid of max values that are less than the minimum margin
+            max_values = [x for x in max_values if x > (
+                min(next5hours) + self._minimum_margin)]
+
         # find  when high prices start
             for index, value in enumerate(next5hours):
                 if value in max_values:
@@ -346,6 +350,9 @@ class manage_energy ():
                 else:
                     insufficient_margin = True
             else:
+                # failsafe as can get abberations in data - don't discharge if current price isn't greater than the minimum margin over next 5 hours
+                if forecasts.actual_feedin < (min(next5hours) + self._minimum_margin):
+                    insufficient_margin = True
                 # to give us how many blocks of high prices we have
                 blocks_till_price_drops = end_high_prices - start_high_prices
 
