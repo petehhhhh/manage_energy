@@ -16,7 +16,7 @@ class Forecasts():
 
     def __init__(self, hass) -> None:
         self._hass = hass
-        self.available_energy = 0
+        self.available_battery_energy = 0
         self.actual_price = 0
         self.actual_feedin = 0
         self.actual_battery_pct_level = 0
@@ -26,6 +26,7 @@ class Forecasts():
         self.actual_solar = 0
         self.battery_charge_rate = 0
         self.actual_consumption = 0
+        self.excess_energy = 0
 
         self.amber = []
         self.start_time = []
@@ -55,6 +56,8 @@ class Forecasts():
             "sensor.solaredge_b1_dc_power")
         self.actual_consumption = self.get_entity_state(
             "sensor.power_consumption")
+        self.excess_energy = self.actual_solar - \
+            self.actual_consumption - self.battery_charge_rate
 
     def forecast_amber(self):
 
@@ -99,9 +102,9 @@ class Forecasts():
     def forecast_battery_and_exports(self):
 
         # current energy in battery is the level of the battery less the unusable energy circa 10%
-        self.available_energy = (self.battery_max_energy * self.actual_battery_pct_level /
-                                 100) - (self.battery_max_energy - self.battery_max_usable_energy)
-        battery_energy_level = self.available_energy
+        self.available_battery_energy = (self.battery_max_energy * self.actual_battery_pct_level /
+                                         100) - (self.battery_max_energy - self.battery_max_usable_energy)
+        battery_energy_level = self.available_battery_energy
         battery_forecast = []
         export_forecast = []
         for forecast_net_energy in self.net:
@@ -144,7 +147,7 @@ class Forecasts():
         # check if have history record for this start time before adding it
         if len(history) > 0:
 
-            if self.compare_datetimes(self.start_time[6], history[-1]["start_time"]):
+            if self.compare_datetimes(self.start_time[0], history[-1]["start_time"]):
                 # remove the last record and replace with the new one
                 history.pop()
 
@@ -173,6 +176,7 @@ class Forecasts():
             self.solar = solar_forecast
         self.net = [s - c for s, c in zip(self.solar, self.consumption)]
         self.battery_energy, self.export = self.forecast_battery_and_exports()
+
         self.store_history()
 
     def format_date(self, std1):

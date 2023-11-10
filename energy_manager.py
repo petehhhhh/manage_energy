@@ -135,7 +135,7 @@ class manage_energy ():
         self._tesla_mode = mode
         await self.refresh()
 
-    async def tesla_charging(self, available_power):
+    async def tesla_charging(self, forecasts):
         _LOGGER.info("Checking whether to charge Tesla")
         # Turn Tesla charging on if the plugged in and at home.
         tesla_plugged_in = (self._hass.states.get(
@@ -149,13 +149,14 @@ class manage_energy ():
         # check  pete_s_tesla_charger_door is closed
         tesla_door = self._hass.states.get(
             "cover.pete_s_tesla_charger_door").state
+
         tesla_charger_door_closed = (self._hass.states.get(
             "cover.pete_s_tesla_charger_door").state == 'closed')
 
         if self._tesla_mode == TeslaModeSelectOptions.FAST_GRID or (self.forecasts.actual_price <= self._cheap_price and self._tesla_mode == TeslaModeSelectOptions.CHEAP_GRID):
             charge_amps = 16
         else:
-            charge_amps = round(available_power*1000 / 240 / 3, 0)
+            charge_amps = round(forecasts.excess_energy * 1000 / 240 / 3, 0)
 
         if tesla_plugged_in and not tesla_charger_door_closed and tesla_home:
 
@@ -351,7 +352,7 @@ class manage_energy ():
                 # recalculate actual half hour blocks of discharge available at 5kw rated energy less enough battery to cover consumption
                 available_max_values = max_values
                 energy_to_discharge = float(
-                    forecasts.available_energy - sum(forecasts.consumption[0:blocks_till_price_drops - 1]))
+                    forecasts.available_battery_energy - sum(forecasts.consumption[0:blocks_till_price_drops - 1]))
                 discharge_blocks_available = int(
                     round(energy_to_discharge/BATTERY_DISCHARGE_RATE * 2, 0))
                 if discharge_blocks_available < 1:
@@ -367,11 +368,11 @@ class manage_energy ():
                 start_time = forecasts.start_time[start_high_prices]
                 start_time = forecasts.format_date(start_time)
                 start_str = start_time.strftime('%I:%M%p')
-            available_power = forecasts.net[start_high_prices]
-            tesla_charging = await self.tesla_charging(available_power)
+
+            tesla_charging = await self.tesla_charging(forecasts)
         # Now we can now make a decision if we start to feed in...
             if await self.auto_mode():
-                if discharge_blocks_available > 0 and available_max_values != None and (forecasts.actual_feedin >= min(available_max_values) and not insufficient_margin):
+                if discharge_blocks_available > 0 and not insufficient_margin:
                     await self.update_status("Discharging battery into Price Spike")
                     await self.discharge_battery()
 
