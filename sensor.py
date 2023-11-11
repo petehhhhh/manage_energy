@@ -7,61 +7,70 @@
 # battery), the unit_of_measurement should match what's expected.
 import random
 from homeassistant.components.sensor import (
-    Entity, SensorEntity)
+    Entity, SensorEntity,    SensorDeviceClass,
+    SensorEntityDescription,)
 from homeassistant.helpers.restore_state import RestoreEntity
-
+from homeassistant.helpers.entity import EntityCategory
 
 from .const import DOMAIN
+
+from homeassistant.const import (
+
+    ATTR_IDENTIFIERS,
+    ATTR_MANUFACTURER,
+    ATTR_MODEL,
+    ATTR_NAME,
+)
+
+
+SENSORS: dict[str, SensorEntityDescription] = {
+
+    "status": SensorEntityDescription(
+        key="manage-energy-status",
+        translation_key="status",
+        name="Manage Energy Status",
+        icon="mdi:gauge-low",
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+    "history": SensorEntityDescription(
+        key="manage-energy-history",
+        translation_key="history",
+        name="Manage Energy History",
+        icon="mdi:gauge-low",
+        entity_category=EntityCategory.DIAGNOSTIC,)}
 
 
 async def async_setup_entry(hass, config_entry, async_add_entities):
     """Add sensors for passed config_entry in HA."""
     hub = hass.data[DOMAIN][config_entry.entry_id]
-    name = (config_entry.data["host"])
-    name = name.lower()
 
-    async_add_entities([StatusBase(name + "_status", f"{config_entry.title} Status", config_entry, hub),
-                        HistoryBase(
-        name + "_history2", config_entry.title + " History2", config_entry, hub)
-    ])
+    async_add_entities([StatusBase(SENSORS['status'], config_entry, hub),
+                        HistoryBase(SENSORS["history"], config_entry, hub)
+                        ])
 
 
 class SensorBase(SensorEntity, RestoreEntity):
     """SensorBase for Manage Energy."""
 
-    def __init__(self, name, friendly_name, config_entry, hub) -> None:
+    def __init__(self, entity_description: SensorEntityDescription, config_entry, hub) -> None:
         """Initialize the sensor."""
+        super().__init__()
         self._hub = hub
-        self._unique_id = name
-        self._name = friendly_name
-        self._icon = "mdi:gauge-low"
 
-        self._config_entry = config_entry
-
-        # The name of the entity
-        self._attr_name = self._name
+        self.entity_description = entity_description
 
         self._state = "0"
-        self._device_info = {
-            "identifiers": {(DOMAIN, self._hub.hub_id)},
-            "name": self._hub.name,
-            "manufacturer": hub.manufacturer,
-            "model": "Energy Manager",
-        }
-        self._attributes = {
-            "friendly_name": self._name,
-            "icon": self._icon,
-            "history": [],
-            "unique_id": self._unique_id,
-        }
 
-        self._attributes["icon"] = self._icon
-        self._attributes["friendly_name"] = self._name
-        self._attributes["unique_id"] = self._unique_id
-        self._attributes["device_info"] = self._device_info
-        self._attributes["available"] = True
-        self._attributes["state"] = self._state
-        super().__init__()
+        self._attributes = {}
+        self._attr_extra_state_attributes = {}
+        self._attr_device_info = {
+            ATTR_IDENTIFIERS: {(DOMAIN, self._hub.hub_id)},
+            ATTR_NAME: self._hub.name,
+            ATTR_MANUFACTURER: hub.manufacturer,
+            ATTR_MODEL: "Energy Model",
+
+        }
+        self._unique_id = entity_description.key
 
     @property
     def should_poll(self) -> bool:
@@ -76,17 +85,7 @@ class SensorBase(SensorEntity, RestoreEntity):
     @property
     def name(self) -> str:
         """Return the name of the select entity."""
-        return self._name
-
-    @property
-    def unique_id(self) -> str:
-        """Return a unique ID."""
-        return self._unique_id
-
-    @property
-    def icon(self) -> str:
-        """Return the icon to use in the frontend."""
-        return self._icon
+        return self.entity_description.name
 
     @property
     def native_value(self) -> str:
@@ -94,39 +93,26 @@ class SensorBase(SensorEntity, RestoreEntity):
         return self._state
 
     @property
-    def device_info(self) -> dict:
-        """Return device information about this entity."""
-        return self._device_info
-
-    @property
     def available(self) -> bool:
         """Return True if entity is available."""
         return True
 
     @property
-    def device_state_attributes(self) -> dict:
-        """Return the state attributes."""
-        return self._attributes
-
-    @property
-    def config_entry_id(self):
-        return self._config_entry.entry_id
-
-    @property
-    def config_entry_name(self):
-        return self._config_entry.data["name"]
+    def unique_id(self):
+        """Return the unique ID of the sensor."""
+        return f"me_{self._unique_id}"
 
 
 class StatusBase(SensorBase):
 
     should_poll = False
 
-    def __init__(self, name, friendly_name, config_entry, hub) -> None:
+    def __init__(self, entity_description, config_entry, hub) -> None:
         """Initialize the sensor."""
 
         self._state = hub.state
 
-        super().__init__(name, friendly_name, config_entry, hub)
+        super().__init__(entity_description, config_entry, hub)
 
         self._hub.add_listener(self._on_hub_state_changed)
 
@@ -140,19 +126,18 @@ class StatusBase(SensorBase):
 
 class HistoryBase(SensorBase):
 
-    def __init__(self, name, friendly_name, config_entry, hub) -> None:
+    def __init__(self, entity_description: SensorEntityDescription, config_entry, hub) -> None:
         """Initialize the sensor."""
 
         hub.forecasts.add_listener(self._on_hub_state_changed)
 
-        super().__init__(name, friendly_name, config_entry, hub)
+        super().__init__(entity_description, config_entry, hub)
 
         self._state = "0"
         self._attr_extra_state_attributes = {
 
             "history": []
         }
-        self._attributes["history"] = []
 
     def _on_hub_state_changed(self, new_state):
         """Handle when the hub's state changes."""
