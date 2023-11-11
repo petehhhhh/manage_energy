@@ -249,7 +249,7 @@ class manage_energy ():
         await self._hass.services.async_call('select', 'select_option', {
             'entity_id': 'select.solaredge_i1_limit_control_mode',
             'option': 'Export Control (Export/Import Meter)'}, True)
-        time.asyncio.sleep(5)
+        await asyncio.sleep(5)
         await self._hass.services.async_call('number', 'set_value', {
             'entity_id': 'number.solaredge_i1_site_limit', 'value': '0'}, True)
 

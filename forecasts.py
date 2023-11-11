@@ -134,7 +134,7 @@ class Forecasts():
 
         return battery_forecast, export_forecast
 
-    def store_history(self):
+    async def store_history(self):
         # store the forecast history and the actuals in a sensor
 
         history = self._hass.states.get(
@@ -144,10 +144,10 @@ class Forecasts():
         else:
             history = history.attributes["history"]
 
-        # check if have history record for this start time before adding it
+        # only want one half hour block record keep on popping old record till we move to next half hour block...
         if len(history) > 0:
 
-            if self.compare_datetimes(self.start_time[0], history[-1]["start_time"]):
+            if self.compare_datetimes(self.start_time[6], history[-1]["start_time"]):
                 # remove the last record and replace with the new one
                 history.pop()
 
@@ -177,7 +177,7 @@ class Forecasts():
         self.net = [s - c for s, c in zip(self.solar, self.consumption)]
         self.battery_energy, self.export = self.forecast_battery_and_exports()
 
-        self.store_history()
+        await self.store_history()
 
     def format_date(self, std1):
         format_string = "%Y-%m-%dT%H:%M:%S%z"
