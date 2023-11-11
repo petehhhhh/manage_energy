@@ -112,9 +112,12 @@ class Forecasts():
             if value["start_time"] != None:
                 consumption_yesterday = await self.get_sensor_state_changes_for_fixed_period(
                     'sensor.power_consumption', self.format_date(value["start_time"]))
+                # subtract tesla or overstates consumption
+                tesla_yesterday = 16 * 3 / 1000 * await self.get_sensor_state_changes_for_fixed_period(
+                    'number.pete_s_tesla_charging_amps', self.format_date(value["start_time"]))
                 solar_yesterday = await self.get_sensor_state_changes_for_fixed_period(
                     'sensor.power_solar_generation', self.format_date(value["start_time"]))
-                consumption.append(consumption_yesterday)
+                consumption.append(consumption_yesterday - tesla_yesterday)
                 solar.append(solar_yesterday)
         return consumption, solar
 
