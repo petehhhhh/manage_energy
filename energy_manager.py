@@ -20,6 +20,7 @@ class manage_energy ():
     def __init__(self, hass: HomeAssistant, host: str, poll_frequency: int, minimum_margin: int, cheap_price: int) -> None:
         self._hass = hass
         self._state = ""
+        self._history = []
         self._listeners = []
 
         self.clear_status()
@@ -55,7 +56,7 @@ class manage_energy ():
     def _notify_listeners(self):
         """Notify all listeners about the current state."""
         for callback in self._listeners:
-            callback(self.state)
+            callback(self)
 
     def clear_status(self):
         self._state = ""
@@ -133,6 +134,8 @@ class manage_energy ():
 
     async def set_tesla_mode(self, mode):
         self._tesla_mode = mode
+        await self._hass.services.async_call('button', 'press', {'entity_id': 'button.pete_s_tesla_force_data_update'})
+
         await self.refresh()
 
     async def tesla_charging(self, forecasts):
@@ -269,7 +272,6 @@ class manage_energy ():
 
     async def auto_mode(self) -> bool:
 
-        await self._hass.services.async_call('button', 'press', {'entity_id': 'button.pete_s_tesla_force_data_update'})
         if self._mode == PowerSelectOptions.AUTO:
             return True
         elif self._mode == PowerSelectOptions.DISCHARGE:
@@ -283,7 +285,6 @@ class manage_energy ():
 
     async def tesla_mode(self) -> bool:
 
-        asyc
         if self._mode == TeslaModeSelectOptions.AUTO:
             return True
         elif self._mode == TeslaModeSelectOptions.CHEAP_GRID:
@@ -364,12 +365,15 @@ class manage_energy ():
                 energy_to_discharge = float(
                     forecasts.available_battery_energy - sum(forecasts.consumption[0:blocks_till_price_drops - 1]))
                 discharge_blocks_available = int(
-                    round(energy_to_discharge/BATTERY_DISCHARGE_RATE * 2, 0))
+                    round(energy_to_discharge/BATTERY_DISCHARGE_RATE * 2 + 0.5, 0))
                 if discharge_blocks_available < 1:
                     discharge_blocks_available = 0
                 if discharge_blocks_available < len(max_values):
                     available_max_values = max_values[:(
                         discharge_blocks_available)]
+
+            if forecasts.actual_feedin > max(next5hours[0:5]) and forecasts.actual_feedin > (min(next5hours) + self._minimum_margin):
+                insufficient_margin = False
 
         # estimate how much solar power we will have at time of peak power
 
