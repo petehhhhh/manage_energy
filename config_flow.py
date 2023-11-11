@@ -87,7 +87,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 host = host.replace(" ", "_")
                 host = host.replace("-", "_")
                 host = host.replace(":", "_")
-            #    user_input["host"] = host
+                user_input["host"] = host
                 return self.async_create_entry(title=info["title"], data=user_input)
             except CannotConnect:
                 errors["base"] = "cannot_connect"

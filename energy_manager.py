@@ -9,7 +9,7 @@ from homeassistant.core import HomeAssistant, StateMachine
 from homeassistant.components.recorder import get_instance
 from homeassistant.components.recorder.history import state_changes_during_period
 from homeassistant.helpers.event import async_track_time_interval, async_call_later
-from .forecasts import Forecasts
+from .forecasts import Forecasts, Actuals
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -20,7 +20,7 @@ class manage_energy ():
     def __init__(self, hass: HomeAssistant, host: str, poll_frequency: int, minimum_margin: int, cheap_price: int) -> None:
         self._hass = hass
         self._state = ""
-        self._history = []
+
         self._listeners = []
 
         self.clear_status()
@@ -43,7 +43,8 @@ class manage_energy ():
                      str(int(self._minimum_margin*100)) + " cents")
         self._unsub_refresh = async_track_time_interval(
             self._hass, self.refresh_interval, datetime.timedelta(seconds=self._poll_frequency))
-
+        self.actuals = Actuals(hass)
+        self.forecasts = Forecasts(hass, self.actuals)
         self.handle_manage_energy()
 
     def set_cheap_price(self, value):
@@ -156,10 +157,10 @@ class manage_energy ():
         tesla_charger_door_closed = (self._hass.states.get(
             "cover.pete_s_tesla_charger_door").state == 'closed')
 
-        if self._tesla_mode == TeslaModeSelectOptions.FAST_GRID or (self.forecasts.actual_price <= self._cheap_price and self._tesla_mode == TeslaModeSelectOptions.CHEAP_GRID):
+        if self._tesla_mode == TeslaModeSelectOptions.FAST_GRID or (self.actuals.price <= self._cheap_price and self._tesla_mode == TeslaModeSelectOptions.CHEAP_GRID):
             charge_amps = 16
         else:
-            charge_amps = round(forecasts.excess_energy * 1000 / 240 / 3, 0)
+            charge_amps = round(self.actuals.excess_energy * 1000 / 240 / 3, 0)
 
         if tesla_plugged_in and not tesla_charger_door_closed and tesla_home:
 
@@ -176,7 +177,7 @@ class manage_energy ():
                 if charge_limit <= current_charge:
                     await self.update_status(
                         "Tesla home and plugged in but charge limit reached.")
-                elif (self.forecasts.actual_price > self._cheap_price and self._tesla_mode == TeslaModeSelectOptions.CHEAP_GRID):
+                elif (self.actuals.price > self._cheap_price and self._tesla_mode == TeslaModeSelectOptions.CHEAP_GRID):
                     await self.update_status(
                         "Tesla home and plugged in but grid price over maximum price of " + str(self._cheap_price) + " cents.")
                 else:
@@ -300,7 +301,9 @@ class manage_energy ():
         try:
             self.clear_status()
             _LOGGER.info("Running manage_energy")
-            self.forecasts = Forecasts(self._hass)
+            self.actuals.refresh()
+            actuals = self.actuals
+
             forecasts = self.forecasts
             await forecasts.build()
 
@@ -349,13 +352,13 @@ class manage_energy ():
             # if we didn't find one then check that the current price is the tail of the peak
             available_max_values = None
             if end_high_prices == None:
-                if forecasts.actual_feedin >= (next5hours[0] + self._minimum_margin):
+                if actuals.feedin >= (next5hours[0] + self._minimum_margin):
                     insufficient_margin = False
                 else:
                     insufficient_margin = True
             else:
                 # failsafe as can get abberations in data - don't discharge if current price isn't greater than the minimum margin over next 5 hours
-                if forecasts.actual_feedin < (min(next5hours) + self._minimum_margin):
+                if actuals.feedin < (min(next5hours) + self._minimum_margin):
                     insufficient_margin = True
                 # to give us how many blocks of high prices we have
                 blocks_till_price_drops = end_high_prices - start_high_prices
@@ -363,7 +366,7 @@ class manage_energy ():
                 # recalculate actual half hour blocks of discharge available at 5kw rated energy less enough battery to cover consumption
                 available_max_values = max_values
                 energy_to_discharge = float(
-                    forecasts.available_battery_energy - sum(forecasts.consumption[0:blocks_till_price_drops - 1]))
+                    actuals.available_battery_energy - sum(forecasts.consumption[0:blocks_till_price_drops - 1]))
                 discharge_blocks_available = int(
                     round(energy_to_discharge/BATTERY_DISCHARGE_RATE * 2 + 0.5, 0))
                 if discharge_blocks_available < 1:
@@ -372,7 +375,7 @@ class manage_energy ():
                     available_max_values = max_values[:(
                         discharge_blocks_available)]
 
-            if forecasts.actual_feedin > max(next5hours[0:5]) and forecasts.actual_feedin > (min(next5hours) + self._minimum_margin):
+            if actuals.feedin > max(next5hours[0:5]) and actuals.feedin > (min(next5hours) + self._minimum_margin):
                 insufficient_margin = False
 
         # estimate how much solar power we will have at time of peak power
@@ -391,12 +394,12 @@ class manage_energy ():
                     await self.update_status("Discharging battery into Price Spike")
                     await self.discharge_battery()
 
-                elif forecasts.actual_feedin * 1.2 < max(next5hours[0:5]) and forecasts.actual_feedin <= min(next5hours[0:5]) and forecasts.battery_energy[start_high_prices] < forecasts.battery_max_energy and forecasts.actual_battery_pct_level < 100:
+                elif actuals.feedin * 1.2 < max(next5hours[0:5]) and actuals.feedin <= min(next5hours[0:5]) and start_high_prices != None and forecasts.battery_energy[start_high_prices] < actuals.battery_max_energy and actuals.battery_pct_level < 100:
                     await self.charge_battery()
                     await self.update_status(
                         "Charging battery as not enough solar & battery and prices rising at" + start_str)
 
-                elif forecasts.actual_price < (max_values[0] - self._minimum_margin) and battery_at_peak < forecasts.battery_max_energy and forecasts.actual_battery_pct_level < 100:
+                elif len(max_values) > 0 and actuals.price < (max_values[0] - self._minimum_margin) and battery_at_peak < actuals.battery_max_energy and actuals.battery_pct_level < 100:
                     await self.update_status("Making sure battery charged for upcoming price spike at " +
                                              start_str + " as insufficent solar to charge to peak")
                     await self.charge_battery()
@@ -415,7 +418,7 @@ class manage_energy ():
                                 "Maximising current usage. No useful peak in next 5 hours")
                         await self.maximise_self()
 
-            if (not tesla_charging and forecasts.actual_battery_pct_level >= CURTAIL_BATTERY_LEVEL and forecasts.actual_feedin < 0) or self._curtailment:
+            if (not tesla_charging and actuals.battery_pct_level >= CURTAIL_BATTERY_LEVEL and actuals.feedin < 0) or self._curtailment:
                 await self.curtail_solar()
                 await self.update_status("Curtailing solar")
             else:
