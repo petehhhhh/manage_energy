@@ -139,10 +139,11 @@ class Forecasts():
 
         history = self._hass.states.get(
             "sensor.manage_energy_history")
-        if not hasattr(history, "history") or history.attributes["history"] == None:
-            history = []
-        else:
+        if history is not None and "history" in history.attributes:
+
             history = history.attributes["history"]
+        else:
+            history = []
 
         # only want one half hour block record keep on popping old record till we move to next half hour block...
         if len(history) > 0:
