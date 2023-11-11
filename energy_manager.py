@@ -369,9 +369,10 @@ class manage_energy ():
                         discharge_blocks_available)]
 
         # estimate how much solar power we will have at time of peak power
-            battery_at_peak = forecasts.battery_energy[start_high_prices]
+
             start_str = ""
             if start_high_prices != None:
+                battery_at_peak = forecasts.battery_energy[start_high_prices]
                 start_time = forecasts.start_time[start_high_prices]
                 start_time = forecasts.format_date(start_time)
                 start_str = start_time.strftime('%I:%M%p')
