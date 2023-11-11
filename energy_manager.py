@@ -316,6 +316,7 @@ class manage_energy ():
                 min(next5hours) + self._minimum_margin)]
 
         # find  when high prices start
+            start_high_prices = None
             for index, value in enumerate(next5hours):
                 if value in max_values:
                     start_high_prices = index
