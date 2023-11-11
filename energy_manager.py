@@ -269,6 +269,7 @@ class manage_energy ():
 
     async def auto_mode(self) -> bool:
 
+        await self._hass.services.async_call('button', 'press', {'entity_id': 'button.pete_s_tesla_force_data_update'})
         if self._mode == PowerSelectOptions.AUTO:
             return True
         elif self._mode == PowerSelectOptions.DISCHARGE:
@@ -282,6 +283,7 @@ class manage_energy ():
 
     async def tesla_mode(self) -> bool:
 
+        asyc
         if self._mode == TeslaModeSelectOptions.AUTO:
             return True
         elif self._mode == TeslaModeSelectOptions.CHEAP_GRID:
