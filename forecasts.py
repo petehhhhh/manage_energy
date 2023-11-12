@@ -37,6 +37,7 @@ class Actuals():
             self.consumption - self.battery_charge_rate
         self.available_battery_energy = (self.battery_max_energy * self.battery_pct_level /
                                          100) - (self.battery_max_energy - self.battery_max_usable_energy)
+        self.battery_min_energy = self.battery_max_energy - self.battery_max_usable_energy
 
     def get_entity_state(self, entity_id, attribute=None):
         # get the current value of an entity or its attribute
@@ -130,17 +131,17 @@ class Forecasts():
         export_forecast = []
         for forecast_net_energy in self.net:
             # assume battery is charged at 5kw and discharged at 5kw and calc based on net energy upto 5kw for a half hour period ie KWH = KW/2
-
-            if self._actuals.battery_pct_level >= 100 and forecast_net_energy > 0:
+            battery_pct_level = battery_energy_level / self._actuals.battery_max_energy
+            if battery_pct_level >= 1 and forecast_net_energy > 0:
                 max_rate = 0
 
-            elif battery_energy_level > .9 * self._actuals.battery_max_energy and forecast_net_energy > 1:
+            elif battery_pct_level > .9 * self._actuals.battery_max_energy and forecast_net_energy > 1:
                 # if battery is charging and over 90% then assume charging current = 1kw
                 max_rate = 1
             elif forecast_net_energy > BATTERY_DISCHARGE_RATE:
                 max_rate = BATTERY_DISCHARGE_RATE
 
-            elif battery_energy_level <= (self._actuals.battery_max_usable_energy/self._actuals.battery_max_energy) and forecast_net_energy < 0:
+            elif battery_pct_level <= (self._actuals.battery_min_energy / self._actuals.battery_max_energy) and forecast_net_energy < 0:
                 max_rate = 0
 
             elif forecast_net_energy < -1 * BATTERY_DISCHARGE_RATE:
@@ -150,6 +151,13 @@ class Forecasts():
                 max_rate = forecast_net_energy
 
             battery_energy_level = battery_energy_level + max_rate/2
+
+        # make sure battery never exeeds max or min
+            if battery_energy_level > self._actuals.battery_max_energy:
+                battery_energy_level = self._actuals.battery_max_energy
+            elif battery_energy_level < self._actuals.battery_min_energy:
+                battery_energy_level = self._actuals.battery_min_energy
+
             battery_forecast.append(battery_energy_level)
             export_forecast.append(forecast_net_energy - max_rate)
 
