@@ -59,8 +59,6 @@ class SensorBase(SensorEntity, RestoreEntity):
 
         self.entity_description = entity_description
 
-        self._state = "0"
-
         self._attributes = {}
         self._attr_extra_state_attributes = {}
         self._attr_device_info = {
@@ -124,7 +122,7 @@ class StatusBase(SensorBase):
         return self._state
 
 
-class HistoryBase(SensorBase):
+class HistoryBase(SensorBase, RestoreEntity):
 
     def __init__(self, entity_description: SensorEntityDescription, config_entry, hub) -> None:
         """Initialize the sensor."""
@@ -132,12 +130,6 @@ class HistoryBase(SensorBase):
         hub.forecasts.add_listener(self._on_hub_state_changed)
 
         super().__init__(entity_description, config_entry, hub)
-
-        self._state = "0"
-        self._attr_extra_state_attributes = {
-
-            "history": []
-        }
 
     def _on_hub_state_changed(self, new_state):
         """Handle when the hub's state changes."""

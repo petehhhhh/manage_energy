@@ -375,9 +375,6 @@ class manage_energy ():
                     available_max_values = max_values[:(
                         discharge_blocks_available)]
 
-            if actuals.feedin > max(next5hours[0:5]) and actuals.feedin > (min(next5hours) + self._minimum_margin):
-                insufficient_margin = False
-
         # estimate how much solar power we will have at time of peak power
 
             start_str = ""
@@ -390,7 +387,8 @@ class manage_energy ():
             tesla_charging = await self.tesla_charging(forecasts)
         # Now we can now make a decision if we start to feed in...
             if await self.auto_mode():
-                if discharge_blocks_available > 0 and not insufficient_margin:
+                # if i have available energy and the actual is as good as it gets in the next five hours (with margin) or there is a price spike in the next 5 hours and this is one of the best opportunities...
+                if (actuals.available_battery_energy > actuals.battery_min_energy) and ((actuals.feedin > (max(next5hours[0:5]) + self._minimum_margin)) or (available_max_values != None and actuals.feedin >= max(available_max_values))):
                     await self.update_status("Discharging battery into Price Spike")
                     await self.discharge_battery()
 
