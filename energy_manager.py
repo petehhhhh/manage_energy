@@ -347,6 +347,7 @@ class manage_energy ():
                     end_high_prices = last_end_high_prices
                     insufficient_margin = False
                     break
+
                 last_end_high_prices = end_high_prices
 
             # if we didn't find one then check that the current price is the tail of the peak
@@ -394,11 +395,11 @@ class manage_energy ():
                 if (actuals.available_battery_energy > actuals.battery_min_energy) and ((actuals.feedin >= (max(next5hours[0:5]) + self._minimum_margin)) or (available_max_values != None and len(available_max_values) > 0 and actuals.feedin >= min(available_max_values))):
                     await self.update_status("Discharging battery into Price Spike")
                     await self.discharge_battery()
-            # charge battery if prices rising in the next 2 hours.
-                elif actuals.feedin * 1.2 < max(next5hours[0:4]) and actuals.feedin <= min(next5hours[0:5]) and start_high_prices != None and forecasts.battery_energy[start_high_prices] < actuals.battery_max_energy and actuals.battery_pct_level < 100:
+            # charge battery if prices rising in the next 2 hours and we will be importing energy at the end of the max period
+                elif actuals.feedin * 1.2 < max(next5hours[0:6]) and actuals.feedin <= min(next5hours[0:5]) and start_high_prices != None and forecasts.export[end_high_prices] < 0 and actuals.battery_pct_level < 100:
                     await self.charge_battery()
                     await self.update_status(
-                        "Charging battery as not enough solar & battery and prices rising at" + start_str)
+                        "Charging battery as not enough solar & battery and prices rising at " + start_str)
 
                 elif len(max_values) > 0 and actuals.price < (max_values[0] - self._minimum_margin) and battery_at_peak < actuals.battery_max_energy and actuals.battery_pct_level < 100:
                     await self.update_status("Making sure battery charged for upcoming price spike at " +

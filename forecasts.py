@@ -105,7 +105,7 @@ class Forecasts():
                             "sensor.solcast_pv_forecast_forecast_tomorrow").attributes["detailedForecast"][0: tomorrow_rows]]
         return solar_forecast
 
-    async def get_yesterday(self):
+    async def get_yesterday_consumption(self):
         # Forecast consumption based on yesterday by querying stats database. create a new list with the consumption from yesterday matching the start time of forecast_data
         consumption = []
         solar = []
@@ -118,8 +118,13 @@ class Forecasts():
                     'number.pete_s_tesla_charging_amps', self.format_date(value["start_time"]))
                 solar_yesterday = await self.get_sensor_state_changes_for_fixed_period(
                     'sensor.power_solar_generation', self.format_date(value["start_time"]))
-                consumption.append(consumption_yesterday - tesla_yesterday)
+                net_consumption = consumption_yesterday - tesla_yesterday
+                # consumption can be negative if we pick up a spike in tesla so limit to being 0.7 KW - roughly minimum house consumption
+                if net_consumption < 0.7:
+                    net_consumption = 0.7
+                consumption.append(net_consumption)
                 solar.append(solar_yesterday)
+
         return consumption, solar
 
     def forecast_battery_and_exports(self):
@@ -195,7 +200,7 @@ class Forecasts():
     async def build(self):
 
         self.amber, self.start_time = self.forecast_amber()
-        self.consumption, yesterday_solar = await self.get_yesterday()
+        self.consumption, yesterday_solar = await self.get_yesterday_consumption()
         solar_forecast = self.forecast_solar()
         if len(solar_forecast) < len(self.amber):
             self.solar = yesterday_solar
