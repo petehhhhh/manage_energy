@@ -391,11 +391,11 @@ class manage_energy ():
         # Now we can now make a decision if we start to feed in...
             if await self.auto_mode():
                 # if i have available energy and the actual is as good as it gets in the next five hours (with margin) or there is a price spike in the next 5 hours and this is one of the best opportunities...
-                if (actuals.available_battery_energy > actuals.battery_min_energy) and ((actuals.feedin >= (max(next5hours[0:5]) + self._minimum_margin)) or (available_max_values != None and actuals.feedin >= min(available_max_values))):
+                if (actuals.available_battery_energy > actuals.battery_min_energy) and ((actuals.feedin >= (max(next5hours[0:5]) + self._minimum_margin)) or (available_max_values != None and len(available_max_values) > 0 and actuals.feedin >= min(available_max_values))):
                     await self.update_status("Discharging battery into Price Spike")
                     await self.discharge_battery()
-
-                elif actuals.feedin * 1.2 < max(next5hours[0:5]) and actuals.feedin <= min(next5hours[0:5]) and start_high_prices != None and forecasts.battery_energy[start_high_prices] < actuals.battery_max_energy and actuals.battery_pct_level < 100:
+            # charge battery if prices rising in the next 2 hours.
+                elif actuals.feedin * 1.2 < max(next5hours[0:4]) and actuals.feedin <= min(next5hours[0:5]) and start_high_prices != None and forecasts.battery_energy[start_high_prices] < actuals.battery_max_energy and actuals.battery_pct_level < 100:
                     await self.charge_battery()
                     await self.update_status(
                         "Charging battery as not enough solar & battery and prices rising at" + start_str)
