@@ -396,7 +396,7 @@ class manage_energy ():
                     await self.update_status("Discharging battery into Price Spike")
                     await self.discharge_battery()
             # charge battery if prices rising in the next 2 hours and we will be importing energy at the end of the max period
-                elif actuals.feedin * 1.2 < max(next5hours[0:6]) and actuals.feedin <= min(next5hours[0:5]) and start_high_prices != None and forecasts.export[end_high_prices] < 0 and actuals.battery_pct_level < 100:
+                elif actuals.feedin * 1.2 < max(next5hours[0:6]) and actuals.feedin <= min(next5hours[0:5]) and start_high_prices != None and end_high_prices != None and forecasts.export[end_high_prices] < 0 and actuals.battery_pct_level < 100:
                     await self.charge_battery()
                     await self.update_status(
                         "Charging battery as not enough solar & battery and prices rising at " + start_str)
@@ -417,7 +417,7 @@ class manage_energy ():
                                 "Maximising current usage. Next peak at " + start_str)
                         else:
                             await self.update_status(
-                                "Maximising current usage. No useful peak in next 5 hours")
+                                "Maximising current usage.")
                         await self.maximise_self()
 
             if (not tesla_charging and actuals.battery_pct_level >= CURTAIL_BATTERY_LEVEL and actuals.feedin < 0) or self._curtailment:
