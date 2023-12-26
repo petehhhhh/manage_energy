@@ -160,7 +160,11 @@ class manage_energy ():
         if self._tesla_mode == TeslaModeSelectOptions.FAST_GRID or (self.actuals.price <= self._cheap_price and self._tesla_mode == TeslaModeSelectOptions.CHEAP_GRID):
             charge_amps = 16
         else:
-            charge_amps = round(self.actuals.excess_energy * 1000 / 240 / 3, 0)
+            if self.actuals.feedin <= self._cheap_price:
+                charge_amps = round(
+                    self.actuals.excess_energy * 1000 / 240 / 3, 0)
+            else:
+                charge_amps = 0
 
         if tesla_plugged_in and not tesla_charger_door_closed and tesla_home:
 
