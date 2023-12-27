@@ -259,15 +259,15 @@ class Forecasts():
         changes = await self.recorder.async_add_executor_job(
             state_changes_during_period, self._hass, start_time, end_time, entity_id)
         vals = []
-        for f in changes[entity_id]:
-            # if f.state is a valid float value add it to the list of values
-            try:
-                vals.append(float(f.state))
-            except:
-                continue
-        if len(vals) == 0:
-            avg = 0
-        else:
-            avg = sum(vals) / len(vals)
+        avg = 0
+        if entity_id in changes:
+            for f in changes[entity_id]:
+                # if f.state is a valid float value add it to the list of values
+                try:
+                    vals.append(float(f.state))
+                except:
+                    continue
+            if len(vals) != 0:
+                avg = sum(vals) / len(vals)
 
         return round(avg, 2)
