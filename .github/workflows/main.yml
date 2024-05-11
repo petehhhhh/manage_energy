@@ -1,0 +1,24 @@
+name: Deploy Custom Repository to Home Assistant
+
+on:
+  push:
+    branches:
+      - main  # Replace 'main' with the branch you want to trigger the deployment from
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+
+      - name: Copy files to Home Assistant configuration directory
+        run: |
+          cp -r ./path/to/custom_repo/* ~/.homeassistant/
+
+      - name: Restart Home Assistant
+        uses: home-assistant/action-restart@v1
+        with:
+          token: ${{ secrets.HA_TOKEN }}
+          url: ${{ secrets.HA_URL }}
