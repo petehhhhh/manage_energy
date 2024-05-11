@@ -28,7 +28,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     hub = manage_energy(
         hass, entry.data["host"], poll_frequency, minimum_margin, cheap_price)
     hass.data.setdefault(DOMAIN, {})[entry.entry_id] = hub
-    await hub.refresh()
+    
 
     # This creates each HA object for each platform your device requires.
     # It's done by calling the `async_setup_entry` function in each platform module.
