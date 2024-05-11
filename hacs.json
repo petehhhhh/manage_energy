@@ -1,0 +1,6 @@
+{
+    "name": "Alexander St Manage Energy",
+    "content_in_root": false,
+    "homeassistant": "2024.3.2",
+    "render_readme": false
+  }
