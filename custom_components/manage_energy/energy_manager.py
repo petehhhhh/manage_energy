@@ -157,8 +157,10 @@ class manage_energy ():
     
             tesla_charger_door_closed = (self._hass.states.get(
                 "cover.pete_s_tesla_charger_door").state == 'closed')
+
+            isDemandWindow = await self.is_demand_window()
     
-            if self._tesla_mode == TeslaModeSelectOptions.FAST_GRID or (self.actuals.price <= self._cheap_price and self._tesla_mode == TeslaModeSelectOptions.CHEAP_GRID):
+            if self._tesla_mode == TeslaModeSelectOptions.FAST_GRID or (self.actuals.price <= self._cheap_price and self._tesla_mode == TeslaModeSelectOptions.CHEAP_GRID and not isDemandWindow) :
                 charge_amps = 16
             else:
                 if self.actuals.feedin <= self._cheap_price:
@@ -305,6 +307,12 @@ class manage_energy ():
 
         return False
 
+    async def is_demand_window():
+        current_time = datetime.now().time()
+        start_time = current_time.replace(hour=15, minute=0, second=0, microsecond=0)
+        end_time = current_time.replace(hour=21, minute=0, second=0, microsecond=0)
+        return start_time <= current_time <= end_time
+    
     async def handle_manage_energy(self):
         try:
             self.clear_status()
@@ -398,18 +406,24 @@ class manage_energy ():
 
             tesla_charging = await self.tesla_charging(forecasts)
         # Now we can now make a decision if we start to feed in...
+
+            current_time = datetime.now().time()
+            start_time = current_time.replace(hour=15, minute=0, second=0, microsecond=0)
+            end_time = current_time.replace(hour=21, minute=0, second=0, microsecond=0)
+            isDemandWindow = await self.is_demand_window()
+            
             if await self.auto_mode():
                 # if i have available energy and the actual is as good as it gets in the next five hours (with margin) or there is a price spike in the next 5 hours and this is one of the best opportunities...
                 if (actuals.available_battery_energy > actuals.battery_min_energy) and ((actuals.feedin >= (max(next5hours[0:5]) + self._minimum_margin)) or (available_max_values != None and len(available_max_values) > 0 and actuals.feedin >= min(available_max_values))):
                     await self.update_status("Discharging into Price Spike")
                     await self.discharge_battery()
             # charge battery if prices rising in the next 2 hours and we will be importing energy at the end of the max period
-                elif actuals.feedin * 1.2 < max(next5hours[0:6]) and actuals.feedin <= min(next5hours[0:5]) and start_high_prices != None and end_high_prices != None and forecasts.export[end_high_prices] < 0 and actuals.battery_pct_level < 100:
+                elif not isDemandWindow and actuals.feedin * 1.2 < max(next5hours[0:6]) and actuals.feedin <= min(next5hours[0:5]) and start_high_prices != None and end_high_prices != None and forecasts.export[end_high_prices] < 0 and actuals.battery_pct_level < 100:
                     await self.charge_battery()
                     await self.update_status(
                         "Charging battery as not enough solar & battery and prices rising at " + start_str)
 
-                elif len(max_values) > 0 and actuals.price < (max_values[0] - self._minimum_margin) and battery_at_peak < actuals.battery_max_energy and actuals.battery_pct_level < 100:
+                elif not isDemandWindow and len(max_values) > 0 and actuals.price < (max_values[0] - self._minimum_margin) and battery_at_peak < actuals.battery_max_energy and actuals.battery_pct_level < 100:
                     await self.update_status("Making sure battery charged for upcoming price spike at " +
                                              start_str + " as insufficent solar to charge to peak")
                     await self.charge_battery()
