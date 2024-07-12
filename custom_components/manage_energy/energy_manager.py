@@ -308,9 +308,9 @@ class manage_energy ():
         return False
 
     async def is_demand_window():
-        current_time = datetime.now().time()
-        start_time = current_time.replace(hour=15, minute=0, second=0, microsecond=0)
-        end_time = current_time.replace(hour=21, minute=0, second=0, microsecond=0)
+        current_time = datetime.datetime.now().time()
+        start_time = datetime.time(15, 0, 0)
+        end_time = datetime.time(21, 0, 0)
         return start_time <= current_time <= end_time
     
     async def handle_manage_energy(self):
