@@ -407,9 +407,7 @@ class manage_energy ():
             tesla_charging = await self.tesla_charging(forecasts)
         # Now we can now make a decision if we start to feed in...
 
-            current_time = datetime.now().time()
-            start_time = current_time.replace(hour=15, minute=0, second=0, microsecond=0)
-            end_time = current_time.replace(hour=21, minute=0, second=0, microsecond=0)
+         
             isDemandWindow = await self.is_demand_window()
             
             if await self.auto_mode():
