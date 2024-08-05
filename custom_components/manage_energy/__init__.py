@@ -32,7 +32,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     
     async def handle_manage_energy_service(call: ServiceCall):
         """Handle the service call."""
-        _LOGGER.info("handle_manage_energy service called")
         await hub.handle_manage_energy()
 
     # Register the service
