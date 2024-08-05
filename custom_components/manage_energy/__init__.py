@@ -36,7 +36,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         await hub.handle_manage_energy()
 
     # Register the service
-    hass.services.async_register(DOMAIN, 'manage_energy', handle_manage_energy_service)
+    hass.services.async_register(DOMAIN, 'refresh', handle_manage_energy_service)
     # This creates each HA object for each platform your device requires.
     # It's done by calling the `async_setup_entry` function in each platform module.
     
