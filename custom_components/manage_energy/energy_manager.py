@@ -412,7 +412,7 @@ class manage_energy ():
             
             if await self.auto_mode():
                 # if i have available energy and the actual is as good as it gets in the next five hours (with margin) or there is a price spike in the next 5 hours and this is one of the best opportunities...
-                if (actuals.available_battery_energy > actuals.battery_min_energy) and ((actuals.feedin >= (max(next5hours[0:5]) + self._minimum_margin)) or (available_max_values != None and len(available_max_values) > 0 and actuals.feedin >= min(available_max_values))):
+                if (actuals.available_battery_energy > actuals.battery_min_energy) and ((actuals.feedin >= (0.9 * max(next5hours[0:5]) + self._minimum_margin)) or (available_max_values != None and len(available_max_values) > 0 and actuals.feedin >= 0.9 * min(available_max_values))):
                     await self.update_status("Discharging into Price Spike")
                     await self.discharge_battery()
             # charge battery if prices rising in the next 2 hours and we will be importing energy at the end of the max period
