@@ -316,7 +316,7 @@ class manage_energy ():
     async def handle_manage_energy(self):
         try:
             await self.clear_status()
-            await self.update_status("Runnning manage energy")
+            await self.update_status("Runnning manage energy...")
             
             self.actuals.refresh()
             actuals = self.actuals
@@ -404,7 +404,7 @@ class manage_energy ():
                 start_time = forecasts.start_time[start_high_prices]
                 start_time = forecasts.format_date(start_time)
                 start_str = start_time.strftime('%I:%M%p')
-
+            await self.clear_status()
             tesla_charging = await self.tesla_charging(forecasts)
         # Now we can now make a decision if we start to feed in...
 
