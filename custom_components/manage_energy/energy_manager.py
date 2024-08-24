@@ -59,7 +59,7 @@ class manage_energy ():
         for callback in self._listeners:
             callback(self)
 
-    def clear_status(self):
+    async def clear_status(self):
         self._state = ""
         self._notify_listeners()
 
@@ -315,7 +315,7 @@ class manage_energy ():
     
     async def handle_manage_energy(self):
         try:
-            self.clear_status()
+            await self.clear_status()
             await self.update_status("Runnning manage energy")
             
             self.actuals.refresh()
