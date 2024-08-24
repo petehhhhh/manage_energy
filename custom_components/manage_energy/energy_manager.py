@@ -198,7 +198,7 @@ class manage_energy ():
                         'entity_id': ' number.pete_s_tesla_charging_amps', 'value': 16}, True)
         
         except Exception as e:
-             await self.update_status("Error in Tesla_Charging. Skipping")
+             await self.update_status("Error in Tesla_Charging. Error: " + str(e))
         
         return False
 
