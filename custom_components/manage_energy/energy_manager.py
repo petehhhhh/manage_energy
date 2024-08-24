@@ -316,7 +316,8 @@ class manage_energy ():
     async def handle_manage_energy(self):
         try:
             self.clear_status()
-            _LOGGER.info("Running manage_energy")
+            await self.update_status("Runnning manage energy")
+            
             self.actuals.refresh()
             actuals = self.actuals
 
