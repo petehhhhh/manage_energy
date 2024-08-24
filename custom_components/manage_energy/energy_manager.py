@@ -198,7 +198,7 @@ class manage_energy ():
                         'entity_id': ' number.pete_s_tesla_charging_amps', 'value': 16}, True)
         
         except Exception as e:
-            _LOGGER.error("Error processing Tesla charging. Skipping")
+             await self.update_status("Error in Tesla_Charging. Skipping")
         
         return False
 
