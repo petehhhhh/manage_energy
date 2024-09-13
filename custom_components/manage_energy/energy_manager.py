@@ -23,7 +23,7 @@ class manage_energy ():
 
         self._listeners = []
 
-        await self.clear_status()
+
 
         self._host = host
         self._name = host
