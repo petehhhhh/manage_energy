@@ -1,10 +1,9 @@
-see from .const import BATTERY_DISCHARGE_RATE, CURTAIL_BATTERY_LEVEL, DOMAIN, PowerSelectOptions, TeslaModeSelectOptions
+from .const import BATTERY_DISCHARGE_RATE, CURTAIL_BATTERY_LEVEL, DOMAIN, PowerSelectOptions, TeslaModeSelectOptions
 import time
 import logging
 import traceback
 import datetime
 import asyncio
-import traceback
 from pytz import timezone
 from homeassistant.core import HomeAssistant, StateMachine
 from homeassistant.components.recorder import get_instance
