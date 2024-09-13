@@ -3,6 +3,7 @@ import time
 import logging
 import datetime
 import asyncio
+import traceback
 from pytz import timezone
 from homeassistant.core import HomeAssistant, StateMachine
 from homeassistant.components.recorder import get_instance
@@ -199,7 +200,10 @@ class manage_energy ():
             return False
         
         except Exception as e:
-            await self.update_status("Error in Tesla_Charging.")
+            await self.update_status("Error in Tesla_Charging. Error : " + str(e))
+            error_message = traceback.format_exc()
+    # Log the error with the traceback
+            _LOGGER.error(f"Error in Tesla_Charging: {error_message}")
             return false
         
 
