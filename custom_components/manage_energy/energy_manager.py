@@ -1,4 +1,4 @@
-from .const import BATTERY_DISCHARGE_RATE, CURTAIL_BATTERY_LEVEL, DOMAIN, PowerSelectOptions, TeslaModeSelectOptions
+see from .const import BATTERY_DISCHARGE_RATE, CURTAIL_BATTERY_LEVEL, DOMAIN, PowerSelectOptions, TeslaModeSelectOptions
 import time
 import logging
 import traceback
@@ -200,8 +200,7 @@ class manage_energy ():
         
 
         except Exception as e:
-            error_message = traceback.format_exc()  # This will capture the full error traceback
-            await self.update_status(f"Error in Tesla_Charging. Error: {error_message}")
+            await self.update_status("Error in Tesla_Charging.")
         
         return False
 
