@@ -4,6 +4,7 @@ import logging
 import traceback
 import datetime
 import asyncio
+import traceback
 from pytz import timezone
 from homeassistant.core import HomeAssistant, StateMachine
 from homeassistant.components.recorder import get_instance
@@ -197,8 +198,10 @@ class manage_energy ():
                     await self._hass.services.async_call('number', 'set_value', {
                         'entity_id': ' number.pete_s_tesla_charging_amps', 'value': 16}, True)
         
+
         except Exception as e:
-             await self.update_status("Error in Tesla_Charging. Error: " + str(e))
+            error_message = traceback.format_exc()  # This will capture the full error traceback
+            await self.update_status(f"Error in Tesla_Charging. Error: {error_message}")
         
         return False
 
