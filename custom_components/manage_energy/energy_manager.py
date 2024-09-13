@@ -23,8 +23,6 @@ class manage_energy ():
 
         self._listeners = []
 
-
-
         self._host = host
         self._name = host
         self._poll_frequency = int(poll_frequency)
