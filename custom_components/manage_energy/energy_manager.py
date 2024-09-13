@@ -196,11 +196,13 @@ class manage_energy ():
                     await self._hass.services.async_call('number', 'set_value', {
                         'entity_id': ' number.pete_s_tesla_charging_amps', 'value': 16}, True)
         
-
+            return False
+        
         except Exception as e:
             await self.update_status("Error in Tesla_Charging.")
+            return false
         
-        return False
+
 
     async def discharge_battery(self):
 
