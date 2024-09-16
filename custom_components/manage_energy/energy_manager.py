@@ -198,10 +198,11 @@ class manage_energy ():
             return False
         
         except Exception as e:
-            await self.update_status("Error in Tesla_Charging. Error : " + str(e))
+            msg = str(e)
+            await self.update_status("Error in Tesla_Charging. Error : " + msg)
             error_message = traceback.format_exc()
     # Log the error with the traceback
-            _LOGGER.error(f"Error in Tesla_Charging: {str(e)}. Traceback: {error_message}")
+            _LOGGER.error(f"Error in Tesla_Charging: {msg}. Traceback:\n {error_message}\n\n")
             return False
         
 
