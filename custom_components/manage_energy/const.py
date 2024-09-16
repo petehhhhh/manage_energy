@@ -16,6 +16,7 @@ class PowerSelectOptions(StrEnum):
     AUTO = "Auto"
     DISCHARGE = "Discharge"
     CHARGE = "Charge"
+    OFF = "Solar only (off)"
     MAXIMISE = "Maximise Self"
 
 
