@@ -278,6 +278,12 @@ class manage_energy ():
         await self._hass.services.async_call('select', 'select_option', {
             'entity_id': 'select.solaredge_i1_storage_control_mode',
             'option': 'Maximize Self Consumption'}, True)
+        
+    async def battery_off(self):
+        _LOGGER.info("Turning off battery")
+        await self._hass.services.async_call('select', 'select_option', {
+            'entity_id': 'select.solaredge_i1_storage_control_mode',
+            'option': 'Solar Power Only (Off)'}, True)
 
     async def uncurtail_solar(self):
 
@@ -292,10 +298,16 @@ class manage_energy ():
             return True
         elif self._mode == PowerSelectOptions.DISCHARGE:
             await self.discharge_battery()
+            await self.update_status("Override: Discharging Battery")
         elif self._mode == PowerSelectOptions.CHARGE:
             await self.charge_battery()
+            await self.update_status("Override: Charging Battery")
         elif self._mode == PowerSelectOptions.MAXIMISE:
             await self.maximise_self()
+            await self.update_status("Override: Maximising Self")
+        elif self.mode = PowerSelectOpitons.OFF:
+            await self.battery_off()
+            await self.update_status("Override: Solar only - Battery Off")
 
         return False
 
