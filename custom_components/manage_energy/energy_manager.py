@@ -160,7 +160,7 @@ class manage_energy:
         _LOGGER.info("Checking whether to charge Tesla")
         # Turn Tesla charging on if the plugged in and at home.
         try:
-            tesla_plugged_in = (
+            tesla_charging = (
                 self._hass.states.get("binary_sensor.pete_s_tesla_charger").state
                 == "on"
             )
@@ -168,9 +168,15 @@ class manage_energy:
             charge_limit = int(
                 self._hass.states.get("number.pete_s_tesla_charge_limit").state
             )
+            current_amps = int(
+                self._hass.states.get((" number.pete_s_tesla_charging_amps").state
+            )
+                               
             current_charge = int(
                 self._hass.states.get("sensor.pete_s_tesla_battery").state
             )
+
+             
             # check  pete_s_tesla_charger_door is closed
             tesla_door = self._hass.states.get("cover.pete_s_tesla_charger_door").state
 
@@ -193,23 +199,26 @@ class manage_energy:
                 else:
                     charge_amps = 0
 
-            if tesla_plugged_in and not tesla_charger_door_closed and tesla_home:
+            if not tesla_charger_door_closed and tesla_home:
                 if charge_limit > current_charge and charge_amps > 0:
-                    await self._hass.services.async_call(
-                        "number",
-                        "set_value",
-                        {
-                            "entity_id": " number.pete_s_tesla_charging_amps",
-                            "value": charge_amps,
-                        },
-                        True,
-                    )
-                    await self._hass.services.async_call(
-                        "switch",
-                        "turn_on",
-                        {"entity_id": "switch.pete_s_tesla_charger"},
-                        True,
-                    )
+
+                    if current_amps <> charge_amps:
+                        await self._hass.services.async_call(
+                            "number",
+                            "set_value",
+                            {
+                                "entity_id": " number.pete_s_tesla_charging_amps",
+                                "value": charge_amps,
+                            },
+                            True,
+                        )
+                    if not tesla_charging:
+                        await self._hass.services.async_call(
+                            "switch",
+                            "turn_on",
+                            {"entity_id": "switch.pete_s_tesla_charger"},
+                            True,
+                        )
                     await self.update_status(
                         "Charging Tesla at " + str(charge_amps) + " amps"
                     )
@@ -233,21 +242,23 @@ class manage_energy:
                             "Tesla home and plugged in but Auto mode and no excess power available."
                         )
                     await self.update_status("Turning off charging.")
-                    await self._hass.services.async_call(
-                        "switch",
-                        "turn_off",
-                        {"entity_id": "switch.pete_s_tesla_charger"},
-                        True,
-                    )
-                    await self._hass.services.async_call(
-                        "number",
-                        "set_value",
-                        {
-                            "entity_id": " number.pete_s_tesla_charging_amps",
-                            "value": 16,
-                        },
-                        True,
-                    )
+                    if tesla_charging:
+                        await self._hass.services.async_call(
+                            "switch",
+                            "turn_off",
+                            {"entity_id": "switch.pete_s_tesla_charger"},
+                            True,
+                        )
+                    if current_amps <> 16:
+                        await self._hass.services.async_call(
+                            "number",
+                            "set_value",
+                            {
+                                "entity_id": " number.pete_s_tesla_charging_amps",
+                                "value": 16,
+                            },
+                            True,
+                        )
 
             return False
 
