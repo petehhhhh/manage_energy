@@ -164,12 +164,12 @@ class manage_energy:
                 self._hass.states.get("binary_sensor.pete_s_tesla_via_fleet_charging").state
                 == "on"
             )
-            tesla_home = self._hass.states.get("binary_sensor.pete_s_tesla_presence.state") == "on"
+            tesla_home = (self._hass.states.get("binary_sensor.pete_s_tesla_presence.state") == "on")
             charge_limit = int(
                 self._hass.states.get("number.pete_s_tesla_via_fleet_charge_limit").state
             )
             current_amps = int(
-                self._hass.states.get(" number.pete_s_tesla_via_fleet_charging_amps").state
+                self._hass.states.get("number.pete_s_tesla_via_fleet_charging_amps").state
             )
                                
             current_charge = int(
