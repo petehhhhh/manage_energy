@@ -169,7 +169,7 @@ class manage_energy:
                 self._hass.states.get("number.pete_s_tesla_via_fleet_charge_limit").state
             )
             current_amps = int(
-                self._hass.states.get((" number.pete_s_tesla_via_fleet_charging_amps").state
+                self._hass.states.get(" number.pete_s_tesla_via_fleet_charging_amps").state
             )
                                
             current_charge = int(
