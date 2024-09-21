@@ -198,7 +198,7 @@ class manage_energy:
             if not tesla_charger_door_closed and tesla_home:
                 if charge_limit > current_charge and charge_amps > 0:
 
-                    if current_amps <> charge_amps:
+                    if current_amps != charge_amps:
                         await self._hass.services.async_call(
                             "number",
                             "set_value",
@@ -245,7 +245,7 @@ class manage_energy:
                             {"entity_id": "switch.pete_s_tesla_charger"},
                             True,
                         )
-                    if current_amps <> 16:
+                    if current_amps != 16:
                         await self._hass.services.async_call(
                             "number",
                             "set_value",
