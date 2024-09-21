@@ -161,27 +161,23 @@ class manage_energy:
         # Turn Tesla charging on if the plugged in and at home.
         try:
             tesla_charging = (
-                self._hass.states.get("binary_sensor.pete_s_tesla_charger").state
+                self._hass.states.get("binary_sensor.pete_s_tesla_via_fleet_charging").state
                 == "on"
             )
-            tesla_home = self._hass.states.get("device_tracker.tesla").state == "home"
+            tesla_home = self._hass.states.get("binary_sensor.pete_s_tesla_presence.state") == "on"
             charge_limit = int(
-                self._hass.states.get("number.pete_s_tesla_charge_limit").state
+                self._hass.states.get("number.pete_s_tesla_via_fleet_charge_limit").state
             )
             current_amps = int(
-                self._hass.states.get((" number.pete_s_tesla_charging_amps").state
+                self._hass.states.get((" number.pete_s_tesla_via_fleet_charging_amps").state
             )
                                
             current_charge = int(
-                self._hass.states.get("sensor.pete_s_tesla_battery").state
+                self._hass.states.get("sensor.pete_s_tesla_via_fleet_battery").state
             )
 
-             
-            # check  pete_s_tesla_charger_door is closed
-            tesla_door = self._hass.states.get("cover.pete_s_tesla_charger_door").state
-
             tesla_charger_door_closed = (
-                self._hass.states.get("cover.pete_s_tesla_charger_door").state
+                self._hass.states.get("cover.pete_s_tesla_via_fleet_charger_door").state
                 == "closed"
             )
 
