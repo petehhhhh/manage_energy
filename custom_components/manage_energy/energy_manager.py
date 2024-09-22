@@ -170,8 +170,7 @@ class manage_energy:
                 == "closed"
             )
 
-
-           if not tesla_charger_door_closed and tesla_home:
+            if not tesla_charger_door_closed and tesla_home:
                 return False
                 
             tesla_charging = (
