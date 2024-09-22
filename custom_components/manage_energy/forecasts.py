@@ -38,7 +38,10 @@ class Actuals:
         self.solar = self.get_entity_state("sensor.power_solar_generation")
         self.battery_charge_rate = self.get_entity_state("sensor.solaredge_b1_dc_power")
         self.consumption = self.get_entity_state("sensor.power_consumption")
+        self.curtailed = (self.get_entity_state("select.solaredge_i1_limit_control_mode").state != "Disabled")
         self.excess_energy = self.solar - self.consumption - self.battery_charge_rate
+        if self.curtailed :
+            self.excess_energy += self.solar
         self.available_battery_energy = (
             self.battery_max_energy * self.battery_pct_level / 100
         ) - (self.battery_max_energy - self.battery_max_usable_energy)
