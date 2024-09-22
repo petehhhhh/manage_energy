@@ -186,9 +186,9 @@ class manage_energy:
             isDemandWindow = await self.is_demand_window()
 
             if self._tesla_mode == TeslaModeSelectOptions.FAST_GRID or (
-                self.actuals.price <= self._cheap_price
-                and self._tesla_mode == TeslaModeSelectOptions.CHEAP_GRID
-                and not isDemandWindow
+                ((self.actuals.price <= self._cheap_price
+                and self._tesla_mode == TeslaModeSelectOptions.CHEAP_GRID) or self.actual.price <= 0) 
+                and not isDemandWindow) 
             ):
                 charge_amps = 16
             else:
