@@ -165,12 +165,12 @@ class manage_energy:
                 self._hass.states.get("binary_sensor.pete_s_tesla_presence").state == "on"
             )
 
-            tesla_charger_door_closed = (
+            tesla_charger_door_closed = not (
                 self._hass.states.get("cover.pete_s_tesla_via_fleet_charger_door").state
-                == "closed"
+                == "open"
             )
 
-            if not tesla_charger_door_closed and tesla_home:
+            if  tesla_charger_door_closed or not tesla_home:
                 return False
                 
             tesla_charging = (
