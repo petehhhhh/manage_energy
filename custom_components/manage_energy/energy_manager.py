@@ -165,7 +165,7 @@ class manage_energy:
             tesla_home = (
                 self._hass.states.get("binary_sensor.pete_s_tesla_presence").state == "on"
             )
-            cheap_price = float(self._hass.states.get("input_number.cheap_grid_price").state)
+            cheap_price = float(self._hass.states.get("input_number.cheap_grid_price").state) / 100
 
             tesla_charger_door_closed = not (
                 self._hass.states.get("cover.pete_s_tesla_via_fleet_charger_door").state
