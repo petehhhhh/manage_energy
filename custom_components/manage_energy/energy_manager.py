@@ -196,7 +196,7 @@ class manage_energy:
             if (
                 self._tesla_mode == TeslaModeSelectOptions.FAST_GRID 
                 or (
-                    (self.actuals.price <= self._cheap_price and self._tesla_mode == TeslaModeSelectOptions.CHEAP_GRID) 
+                    (self.actuals.price <= cheap_price and self._tesla_mode == TeslaModeSelectOptions.CHEAP_GRID) 
                     or self.actuals.price <= 0
                 ) 
                 and not isDemandWindow
