@@ -202,7 +202,7 @@ class manage_energy:
                 charge_amps = 16
             else:
                 if self.actuals.feedin <= self._cheap_price:
-                    charge_amps = round(self.actuals.excess_energy * 1000 / 240 / 3, 0)
+                    charge_amps = round(self.actuals.excess_energy * 1000 / 240 / 3, 0) + current_charge
                 else:
                     charge_amps = 0
 
