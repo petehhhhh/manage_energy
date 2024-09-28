@@ -44,6 +44,7 @@ class manage_energy:
         self.manufacturer = "Pete"
         self._locked = False
         self._curtailment = False
+        self._tesla_amps = 0
 
         self._mode = PowerSelectOptions.AUTO
         self._tesla_mode = TeslaModeSelectOptions.AUTO
@@ -204,7 +205,7 @@ class manage_energy:
                 if self.actuals.feedin <= self._cheap_price:
                     charge_amps = round(self.actuals.excess_energy * 1000 / 240 / 3, 0) :
                     if tesla_charging  :
-                          charge_amps += current_amps
+                          charge_amps += self._tesla_amps
                 else:
                     charge_amps = 0
 
@@ -220,6 +221,7 @@ class manage_energy:
                         },
                         True,
                     )
+                self._tesla_amps = charge_amps
          
                 await self._hass.services.async_call(
                         "switch",
