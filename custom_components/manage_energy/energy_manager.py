@@ -504,9 +504,14 @@ class manage_energy:
 
     async def is_demand_window(self) -> bool:
         current_time = datetime.datetime.now().time()
+        current_month = datetime.datetime.now().month
+    
+        # Define peak period months: June to August and November to March
+        peak_months = list(range(6, 9)) + [11, 12, 1, 2, 3]
+    
         start_time = datetime.time(15, 0, 0)
         end_time = datetime.time(21, 0, 0)
-        return start_time <= current_time <= end_time
+        return current_month in peak_months and (start_time <= current_time <= end_time)
 
     async def handle_manage_energy(self):
         try:
