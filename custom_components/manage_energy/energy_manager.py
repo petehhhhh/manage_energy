@@ -35,6 +35,7 @@ class manage_energy:
         self._state = ""
 
         self._listeners = []
+        self._running = False
 
         self._host = host
         self._name = host
@@ -515,6 +516,9 @@ class manage_energy:
 
     async def handle_manage_energy(self):
         try:
+            if self._running :
+                return
+            self._running = True
             await self.clear_status()
             await self.update_status("Runnning manage energy...")
 
@@ -690,3 +694,5 @@ class manage_energy:
             error_details = traceback.format_exc()
             await self.update_status("Error: " + str(e))
             raise RuntimeError("Error in handle_manage_energy: " + str(e))
+        finally :
+            self._running = False
