@@ -1,4 +1,4 @@
-from .const import (
+rfrom .const import (
     BATTERY_DISCHARGE_RATE,
     CURTAIL_BATTERY_LEVEL,
     DOMAIN,
@@ -245,7 +245,7 @@ class manage_energy:
                     and self._tesla_mode == TeslaModeSelectOptions.CHEAP_GRID
                 ):
                     await self.update_status(
-                        "Tesla: Grid price over maximum price of "
+                        "Tesla: Grid price over maximum of "
                         + str(self._cheap_price)
                         + " cents."
                     )
@@ -258,8 +258,6 @@ class manage_energy:
                     await self.update_status(
                         "Tesla: No excess solar."
                     )
-                    
-                await self.update_status("Turning off charging.")
        
                 await self._hass.services.async_call(
                         "switch",
