@@ -1,4 +1,4 @@
-rfrom .const import (
+from .const import (
     BATTERY_DISCHARGE_RATE,
     CURTAIL_BATTERY_LEVEL,
     DOMAIN,
