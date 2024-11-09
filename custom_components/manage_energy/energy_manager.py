@@ -208,6 +208,8 @@ class manage_energy:
                     charge_amps = round(self.actuals.excess_energy * 1000 / 240 / 3, 0) 
                     if tesla_charging  :
                           charge_amps += self._tesla_amps
+                    if charge_amps < 0 :
+                        charge_amps = 0
                 elif self.actuals.feedin > cheap_price:
                     charge_amps = 0
 
