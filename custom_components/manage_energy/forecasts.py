@@ -42,8 +42,7 @@ class Actuals:
         self.excess_energy = self.solar - self.consumption - self.battery_charge_rate
         if self.curtailed :
             self.excess_energy += self.solar
-        if self.excess_energy < 0:
-            self.excess_energy = 0
+       
         self.available_battery_energy = (
             self.battery_max_energy * self.battery_pct_level / 100
         ) - (self.battery_max_energy - self.battery_max_usable_energy)
