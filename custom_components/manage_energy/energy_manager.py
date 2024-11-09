@@ -238,21 +238,27 @@ class manage_energy:
             else:
                 if charge_limit <= current_charge:
                     await self.update_status(
-                        "Tesla home and plugged in but charge limit reached."
+                        "Tesla: charge limit reached."
                     )
                 elif (
                     self.actuals.price > self._cheap_price
                     and self._tesla_mode == TeslaModeSelectOptions.CHEAP_GRID
                 ):
                     await self.update_status(
-                        "Tesla home and plugged in but grid price over maximum price of "
+                        "Tesla: Grid price over maximum price of "
                         + str(self._cheap_price)
                         + " cents."
                     )
                 else:
+                  if self.actuals.feedin <= cheap_price:
                     await self.update_status(
-                        "Tesla Auto mode and No excess (charge amps=" + str(charge_amps) + "kWh)"
+                        "Tesla: Feed in over cheap price."
                     )
+                  else:
+                    await self.update_status(
+                        "Tesla: No excess solar."
+                    )
+                    
                 await self.update_status("Turning off charging.")
        
                 await self._hass.services.async_call(
