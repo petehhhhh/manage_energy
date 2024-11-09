@@ -251,7 +251,7 @@ class manage_energy:
                     )
                 else:
                     await self.update_status(
-                        "Tesla home and plugged in but Auto mode and no excess power available."
+                        "Tesla Auto mode and No excess (=" + str(self.actuals.excess_energy) + "kWh)"
                     )
                 await self.update_status("Turning off charging.")
        
