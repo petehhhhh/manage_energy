@@ -254,11 +254,11 @@ class manage_energy:
                 else:
                   if self.actuals.feedin <= cheap_price:
                     await self.update_status(
-                        "Tesla: Feed in over cheap price."
+                        "Tesla: No excess solar."
                     )
                   else:
                     await self.update_status(
-                        "Tesla: No excess solar."
+                        "Tesla: Feed in over cheap price."
                     )
        
                 await self._hass.services.async_call(
