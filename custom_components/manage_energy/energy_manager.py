@@ -252,9 +252,12 @@ class manage_energy:
                         + " cents."
                     )
                 else:
-                  if self.actuals.feedin <= cheap_price:
-                    await self.update_status(
-                        "Tesla: No excess solar."
+                  if inDemandWindow and self._tesla_mode == TeslaModeSelectOptions.CHEAP_GRID and self.actuals.price <= cheap_price:
+                      await self.update_status(
+                            "Tesla: In demand window."
+                  elif self.actuals.feedin <= cheap_price:
+                        await self.update_status(
+                            "Tesla: No excess solar."
                     )
                   else:
                     await self.update_status(
