@@ -31,11 +31,13 @@ fi
 
 # Run Supervisor command (ensure this exists and works)
 if command -v supervisor_run &>/dev/null; then
-    supervisor_run
+    supervisor_run &
 else
     echo "Error: supervisor_run command not found. Skipping."
     exit 1
 fi
+
+ha core start
 
 echo "Script completed successfully."
 
