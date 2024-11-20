@@ -29,15 +29,10 @@ if [ $? -ne 0 ]; then
     exit 1
 fi
 
-# Run Supervisor command (ensure this exists and works)
-if command -v supervisor_run &>/dev/null; then
-    supervisor_run &
-else
-    echo "Error: supervisor_run command not found. Skipping."
-    exit 1
-fi
+# for ha core restart to work, need to have supervisor_run running background...
 
-ha core start
+
+ha core restart
 
 echo "Script completed successfully."
 
