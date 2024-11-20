@@ -31,8 +31,13 @@ fi
 
 # for ha core restart to work, need to have supervisor_run running background...
 
-
 ha core restart
+if [ $? -ne 0 ]; then
+    echo "ha core start failed. Make sure supervisor_run has been started in background."
+    exit 1
+fi
+
+
 
 echo "Script completed successfully."
 
