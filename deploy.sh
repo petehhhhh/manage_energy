@@ -23,7 +23,7 @@ if [ $? -ne 0 ]; then
 fi
 
 # Copy files to Home Assistant's custom_components directory
-sudo cp -r /workspaces/manage_energy/custom_components/manage_energy/* /tmp/supervisor_data/homeassistant/custom_components/manage_energy
+sudo cp -r /workspaces/manage_energy/custom_components/manage_energy /tmp/supervisor_data/homeassistant/custom_components
 if [ $? -ne 0 ]; then
     echo "Copy failed. Exiting."
     exit 1
