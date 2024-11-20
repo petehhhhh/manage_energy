@@ -11,10 +11,10 @@ import datetime
 import asyncio
 import traceback
 from pytz import timezone
-from homeassistant.core import HomeAssistant, StateMachine
-from homeassistant.components.recorder import get_instance
-from homeassistant.components.recorder.history import state_changes_during_period
-from homeassistant.helpers.event import async_track_time_interval, async_call_later
+from homeassistant.core import HomeAssistant, StateMachine # type: ignore
+from homeassistant.components.recorder import get_instance # type: ignore
+from homeassistant.components.recorder.history import state_changes_during_period # type: ignore
+from homeassistant.helpers.event import async_track_time_interval, async_call_later # type: ignore
 from .forecasts import Forecasts, Actuals
 
 _LOGGER = logging.getLogger(__name__)
@@ -162,7 +162,7 @@ class manage_energy:
         _LOGGER.info("Checking whether to charge Tesla")
         # Turn Tesla charging on if the plugged in and at home.
         try:
-          
+
             tesla_home = (
                 self._hass.states.get("binary_sensor.pete_s_tesla_presence").state == "on"
             )
@@ -175,7 +175,7 @@ class manage_energy:
 
             if  tesla_charger_door_closed or not tesla_home:
                 return False
-                
+
             tesla_charging = (
                 self._hass.states.get("binary_sensor.pete_s_tesla_via_fleet_charging").state
                 == "on"
@@ -186,26 +186,26 @@ class manage_energy:
             current_amps = int(
                 self._hass.states.get("number.pete_s_tesla_via_fleet_charging_amps").state
             )
-                               
+
             current_charge = int(
                 self._hass.states.get("sensor.pete_s_tesla_via_fleet_battery").state
             )
 
-   
+
             isDemandWindow = await self.is_demand_window()
 
             if (
-                self._tesla_mode == TeslaModeSelectOptions.FAST_GRID 
+                self._tesla_mode == TeslaModeSelectOptions.FAST_GRID
                 or (
-                    (self.actuals.price <= cheap_price and self._tesla_mode == TeslaModeSelectOptions.CHEAP_GRID) 
+                    (self.actuals.price <= cheap_price and self._tesla_mode == TeslaModeSelectOptions.CHEAP_GRID)
                     or self.actuals.price <= 0
-                ) 
+                )
                 and not isDemandWindow
             ):
                 charge_amps = 16
             else:
                 if self.actuals.feedin <= cheap_price:
-                    charge_amps = round(self.actuals.excess_energy * 1000 / 240 / 3, 0) 
+                    charge_amps = round(self.actuals.excess_energy * 1000 / 240 / 3, 0)
                     if tesla_charging  :
                           charge_amps += self._tesla_amps
                     if charge_amps < 0 :
@@ -213,7 +213,7 @@ class manage_energy:
                 elif self.actuals.feedin > cheap_price:
                     charge_amps = 0
 
-     
+
             if charge_limit > current_charge and charge_amps > 0:
 
                 await self._hass.services.async_call(
@@ -226,7 +226,7 @@ class manage_energy:
                         True,
                     )
                 self._tesla_amps = charge_amps
-         
+
                 await self._hass.services.async_call(
                         "switch",
                         "turn_on",
@@ -255,7 +255,7 @@ class manage_energy:
                   if isDemandWindow and self._tesla_mode == TeslaModeSelectOptions.CHEAP_GRID and self.actuals.price <= cheap_price:
                       await self.update_status(
                             "Tesla: In demand window."
-                      ) 
+                      )
                   elif self.actuals.feedin <= cheap_price:
                         await self.update_status(
                             "Tesla: No excess solar."
@@ -264,7 +264,7 @@ class manage_energy:
                     await self.update_status(
                         "Tesla: Feed in over cheap price."
                     )
-       
+
                 await self._hass.services.async_call(
                         "switch",
                         "turn_off",
@@ -516,10 +516,10 @@ class manage_energy:
     async def is_demand_window(self) -> bool:
         current_time = datetime.datetime.now().time()
         current_month = datetime.datetime.now().month
-    
+
         # Define peak period months: June to August and November to March
         peak_months = list(range(6, 9)) + [11, 12, 1, 2, 3]
-    
+
         start_time = datetime.time(15, 0, 0)
         end_time = datetime.time(21, 0, 0)
         return current_month in peak_months and (start_time <= current_time <= end_time)

@@ -16,21 +16,22 @@ fi
 
 pushd .
 
-cd /workspaces/manage_energy
+cd /workspaces/manage_energy || exit
 # Stage and commit changes
 git add /workspaces/manage_energy
 git commit -m "$1"
 if [ $? -ne 0 ]; then
     echo "Git commit failed. Exiting."
-    popd
+    popd || exit
     exit 1
 fi
 
 # Push changes to GitHub
 git push origin main
+# shellcheck disable=SC2181
 if [ $? -ne 0 ]; then
     echo "Git push failed. Exiting."
-    popd
+    popd || exit
     exit 1
 fi
 
@@ -38,14 +39,15 @@ fi
 # for ha core restart to work, need to have supervisor_run running background...
 
 ha core restart
+# shellcheck disable=SC2181
 if [ $? -ne 0 ]; then
     echo "ha core start failed. Make sure supervisor_run has been started in background."
-    popd
+    popd || exit
     exit 1
 fi
 
 echo "Script completed successfully."
 
-popd
+popd || exit
 
 
