@@ -525,6 +525,8 @@ class manage_energy:
         return current_month in peak_months and (start_time <= current_time <= end_time)
 
     async def handle_manage_energy(self):
+ #temporary until i get round to fixingin for Tesla battery...
+        return
         try:
             if self._running :
                 return
