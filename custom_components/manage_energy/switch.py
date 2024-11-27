@@ -82,3 +82,22 @@ class SolarCurtailmentSwitch(SwitchEntity):
     async def async_update(self):
         """Update the state of the switch."""
         self._state = await self._hub.get_solar_curtailment()
+        
+class AutoSwitch(SwitchEntity):
+    """Representation of a switch for solar curtailment."""
+    type = "Auto Power Management"
+
+    def __init__(self, name, title, hub):
+
+        self._state = True
+        self._hub = hub
+        self._name = title
+        self._icon = "mdi:power-plug"
+        self._available = True
+        self._unique_id = f"{self._hub.hub_id}-{self._id}"
+        self._device_info = {
+            "identifiers": {(DOMAIN, self._hub.hub_id)},
+            "name": self._name,
+            "manufacturer": self._hub.manufacturer,
+            "model": "Energy Manager"}
+        self.enabled_by_default = True
