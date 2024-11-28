@@ -152,6 +152,6 @@ class PowerModeSelect(BaseSelect):
             self.async_schedule_update_ha_state()
 
         # Listen for changes in the auto_switch state
-        self._hass.bus.async_listen(
+        self.hass.bus.async_listen(
             "state_changed", async_auto_switch_state_listener)
         
