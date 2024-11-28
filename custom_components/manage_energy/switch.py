@@ -140,3 +140,20 @@ class AutoSwitch(SwitchEntity):
         """Return True if entity is available."""
         return self._available
 
+
+    async def async_turn_on(self, **kwargs):
+        """Turn the switch on."""
+        self._state = True
+        await self._hub.set_auto(self._state)
+        self.async_write_ha_state()
+
+    async def async_turn_off(self, **kwargs):
+        """Turn the switch off."""
+        self._state = False
+        await self._hub.set_auto(self._state)
+        self.async_write_ha_state()
+
+    async def async_update(self):
+        """Update the state of the switch."""
+        self._state = await self._hub.get_auto()
+
