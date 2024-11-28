@@ -127,7 +127,7 @@ class PowerModeSelect(BaseSelect):
 
     @property
     def available(self) -> bool:
-    """ Return True if auto mode not enable..."""
+        """ Return True if auto mode not enable..."""
         self._available = not self._hub.get_auto()
         return self._available
 
