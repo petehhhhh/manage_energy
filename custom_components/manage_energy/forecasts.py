@@ -33,8 +33,8 @@ class Actuals:
             "sensor.battery1_battery_capacity") + self.get_entity_state(
             "sensor.battery2_battery_capacity") 
         
-        self.battery_max_usable_energy = self.battery_max_usable_energy * 0.97
         # assume 3% reserve on battery.
+        self.battery_max_usable_energy = self.battery_max_energy * 0.97
         
         self.solar = self.get_entity_state("sensor.power_solar_generation")
         self.battery_charge_rate = self.get_entity_state("sensor.home_load_import") * -1
