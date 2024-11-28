@@ -162,7 +162,7 @@ class manage_energy:
             notify_listeners()
             await self.refresh()
             
-    def get_mode(self) : str
+    def get_mode(self) -> str:
         return self._mode
 
     async def set_tesla_mode(self, mode):
