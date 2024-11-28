@@ -133,7 +133,7 @@ class PowerModeSelect(BaseSelect):
         #self._available = not self._hub.get_auto()
         return self._available
 
-	def select_option(self,option:str) -> None:
+    def select_option(self,option:str) -> None:
         """Change the selected option."""
         self._state = option
         self._attributes["state"] = self._state
