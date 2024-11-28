@@ -68,7 +68,7 @@ class SolarCurtailmentSwitch(SwitchEntity):
     @property
     def available(self) -> bool:
         """Return True if auto mode not enabled."""
-        return not self._hub.get_auto()
+        return True 
 
     async def async_turn_on(self, **kwargs):
         """Turn the switch on."""
