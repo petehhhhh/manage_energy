@@ -13,7 +13,7 @@ CURTAIL_BATTERY_LEVEL = 90
 
 class PowerSelectOptions(StrEnum):
     """Power select options."""
-    AUTO = "Auto"
+
     DISCHARGE = "Discharge"
     CHARGE = "Charge"
     OFF = "Solar only (off)"
