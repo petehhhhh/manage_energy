@@ -157,7 +157,7 @@ class PowerModeSelect(BaseSelect):
         @callback
         def async_mode_change_listener(event):
             """React to changes in the auto_switch state."""
-            select_option(self._hub.get_mode())
+            self.select_option(self._hub.get_mode())
             self.async_schedule_update_ha_state()
 
         # Listen for changes in the auto_switch state
