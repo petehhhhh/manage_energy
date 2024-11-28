@@ -21,7 +21,7 @@ class BaseSelect(SelectEntity):
         self._state = None
         self._icon = "mdi:menu"
         self._unique_id = f"{self._hub.hub_id}-{self._id}"
-        self._available = not self._hub.get_auto()
+        self._available = True
         self._enabled = True
         self._state = self._options[0]
         self._attr_options = list(self._options)
@@ -124,13 +124,13 @@ class PowerModeSelect(BaseSelect):
 
         self._options = [option.value for option in PowerSelectOptions]
         super().__init__(select_id, name, hub)
+        self._available = not self._hub.get_auto()
         
 
     @property
     def available(self) -> bool:
     # Return True if auto mode not enabled unless already been set unavailable
-        if not self._available:
-            self._available = not self._hub.get_auto()
+        self._available = not self._hub.get_auto()
         return self._available
 
     
