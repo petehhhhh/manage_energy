@@ -16,7 +16,7 @@ async def async_setup_entry(hass, config_entry, async_add_entities):
 
 class SolarCurtailmentSwitch(SwitchEntity):
     """Representation of a switch for solar curtailment."""
-    type = "solar curtailmen"
+    type = "solar curtailment"
 
     def __init__(self, name, title, hub):
 
@@ -90,7 +90,7 @@ class AutoSwitch(SwitchEntity):
     type = "Auto Power Management"
 
     def __init__(self, name, title, hub):
-
+        self._id = name
         self._state = True
         self._hub = hub
         self._name = title
