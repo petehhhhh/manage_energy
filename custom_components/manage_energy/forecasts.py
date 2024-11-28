@@ -173,7 +173,7 @@ class Forecasts:
                 and forecast_net_energy > 1
             ):
                 # if battery is charging and over 90% then assume charging current = 1kw
-                max_rate = 1
+                max_rate = 5
             elif forecast_net_energy > BATTERY_DISCHARGE_RATE:
                 max_rate = BATTERY_DISCHARGE_RATE
 

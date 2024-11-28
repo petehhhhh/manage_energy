@@ -414,21 +414,21 @@ class manage_energy:
             forecasts = self.forecasts
             await forecasts.build()
 
-            next5hours = forecasts.amber[0:10]
-            # Assume we have 2 hours worth of discharge at 5 KW
-            discharge_blocks_available = 4
+            next6hours = forecasts.amber[0:24]
+     
+            discharge_blocks_available = round(actuals.battery_max_usable_energy / BATTERY_DISCHARGE_RATE,0)
 
-            # work out when in next 5 hours we can best use available blocks of discharge
-            max_values = sorted(next5hours, reverse=True)[:(discharge_blocks_available)]
+            # work out when in next 12 hours we can best use available blocks of discharge
+            max_values = sorted(next6hours, reverse=True)[:(discharge_blocks_available)]
 
             # get rid of max values that are less than the minimum margin
             max_values = [
-                x for x in max_values if x > (min(next5hours) + self._minimum_margin)
+                x for x in max_values if x > (min(next6hours) + self._minimum_margin)
             ]
 
             # find  when high prices start
             start_high_prices = None
-            for index, value in enumerate(next5hours):
+            for index, value in enumerate(next6hours):
                 if value in max_values:
                     start_high_prices = index
                     break
@@ -438,7 +438,7 @@ class manage_energy:
             end_high_prices = None
             for index1, value1 in enumerate(max_values):
                 end_high_prices = None
-                for index, value in enumerate(next5hours):
+                for index, value in enumerate(next6hours):
                     # if this entry is after the start of high prices and it is less than this value less required margin...
                     if (index > start_high_prices) and (
                         value <= (value1 - self._minimum_margin)
@@ -462,13 +462,13 @@ class manage_energy:
             # if we didn't find one then check that the current price is the tail of the peak
             available_max_values = None
             if end_high_prices == None:
-                if actuals.feedin >= (next5hours[0] + self._minimum_margin):
+                if actuals.feedin >= (next6hours[0] + self._minimum_margin):
                     insufficient_margin = False
                 else:
                     insufficient_margin = True
             else:
                 # failsafe as can get abberations in data - don't discharge if current price isn't greater than the minimum margin over next 5 hours
-                if actuals.feedin < (min(next5hours) + self._minimum_margin):
+                if actuals.feedin < (min(next6hours) + self._minimum_margin):
                     insufficient_margin = True
                 # to give us how many blocks of high prices we have
                 blocks_till_price_drops = end_high_prices - start_high_prices
@@ -490,7 +490,7 @@ class manage_energy:
                 if len(
                     available_max_values
                 ) < discharge_blocks_available and actuals.feedin >= (
-                    min(next5hours) + self._minimum_margin
+                    min(next6hours) + self._minimum_margin
                 ):
                     available_max_values.append(actuals.feedin)
 
@@ -503,6 +503,7 @@ class manage_energy:
                 start_time = forecasts.format_date(start_time)
                 start_str = start_time.strftime("%I:%M%p")
             await self.clear_status()
+            
             tesla_charging = await self.tesla_charging(forecasts)
             # Now we can now make a decision if we start to feed in...
 
@@ -513,7 +514,7 @@ class manage_energy:
                 if (actuals.available_battery_energy > actuals.battery_min_energy) and (
                     (
                         actuals.feedin
-                        >= (0.9 * max(next5hours[0:5]) + self._minimum_margin)
+                        >= (0.9 * max(next6hours[0:5]) + self._minimum_margin)
                     )
                     or (
                         available_max_values != None
@@ -523,14 +524,15 @@ class manage_energy:
                 ):
                     await self.update_status("Discharging into Price Spike")
                     await self.discharge_battery()
-                # charge battery if prices rising in the next 2 hours and we will be importing energy at the end of the max period
+                    
+                # charge battery if prices rising in the next 6 hours and we will be importing energy at the end of the max period
                 elif (
-                    actuals.feedin * 1.3 < max(next5hours[0:6])
-                    and actuals.feedin <= min(next5hours[0:5])
+                    actuals.feedin * 1.3 < max(next6hours[0:12])
+                    and actuals.feedin <= min(next6hours[0:12])
                     and start_high_prices != None
                     and end_high_prices != None
                     and forecasts.export[end_high_prices] < 0
-                    and actuals.battery_pct_level < 100
+                    and actuals.battery_pct_level < 99
                 ):
                     await self.charge_battery()
                     await self.update_status(
