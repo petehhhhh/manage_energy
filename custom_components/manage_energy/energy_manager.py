@@ -5,6 +5,7 @@ from .const import (
     PowerSelectOptions,
     TeslaModeSelectOptions,
 )
+
 import time
 import logging
 import datetime
@@ -303,128 +304,17 @@ class manage_energy:
 
     async def discharge_battery(self):
         _LOGGER.info("Discharging battery")
-        await self._hass.services.async_call(
-            "select",
-            "select_option",
-            {
-                "entity_id": "select.solaredge_i1_storage_control_mode",
-                "option": "Remote Control",
-            },
-            True,
-        )
-        await asyncio.sleep(5)
-        await self._hass.services.async_call(
-            "select",
-            "select_option",
-            {
-                "entity_id": "select.solaredge_i1_storage_default_mode",
-                "option": "Discharge to Maximize Export",
-            },
-            True,
-        )
-        await self._hass.services.async_call(
-            "select",
-            "select_option",
-            {
-                "entity_id": "select.solaredge_i1_storage_command_mode",
-                "option": "Discharge to Maximize Export",
-            },
-            True,
-        )
-
+        await self.set_mode(DISCHARGE)
+        
     async def preserve_battery(self):
         _LOGGER.info("Preserving battery - top up from Solar if available")
-        await self._hass.services.async_call(
-            "select",
-            "select_option",
-            {
-                "entity_id": "select.solaredge_i1_storage_control_mode",
-                "option": "Remote Control",
-            },
-            True,
-        )
-        await asyncio.sleep(5)
-        await self._hass.services.async_call(
-            "select",
-            "select_option",
-            {
-                "entity_id": "select.solaredge_i1_storage_default_mode",
-                "option": "Charge from Solar Power",
-            },
-            True,
-        )
-        await self._hass.services.async_call(
-            "select",
-            "select_option",
-            {
-                "entity_id": "select.solaredge_i1_storage_command_mode",
-                "option": "Charge from Solar Power",
-            },
-            True,
-        )
-
+        await self.set_mode(OFF)
+    
     async def charge_battery(self):
         _LOGGER.info("Charging battery")
-        await self._hass.services.async_call(
-            "select",
-            "select_option",
-            {
-                "entity_id": "select.solaredge_i1_storage_control_mode",
-                "option": "Remote Control",
-            },
-            True,
-        )
-        await asyncio.sleep(5)
-        await self._hass.services.async_call(
-            "select",
-            "select_option",
-            {
-                "entity_id": "select.solaredge_i1_storage_default_mode",
-                "option": "Charge from Solar Power and Grid",
-            },
-            True,
-        )
-        await self._hass.services.async_call(
-            "select",
-            "select_option",
-            {
-                "entity_id": "select.solaredge_i1_storage_command_mode",
-                "option": "Charge from Solar Power and Grid",
-            },
-            True,
-        )
+        await self.set_mode(CHARGE)
 
-    async def charge_from_solar(self):
-        _LOGGER.info("Charging battery from Solar")
-        await self._hass.services.async_call(
-            "select",
-            "select_option",
-            {
-                "entity_id": "select.solaredge_i1_storage_control_mode",
-                "option": "Remote Control",
-            },
-            True,
-        )
-        await asyncio.sleep(5)
-        await self._hass.services.async_call(
-            "select",
-            "select_option",
-            {
-                "entity_id": "select.solaredge_i1_storage_default_mode",
-                "option": "Charge from Solar Power",
-            },
-            True,
-        )
-        await self._hass.services.async_call(
-            "select",
-            "select_option",
-            {
-                "entity_id": "select.solaredge_i1_storage_command_mode",
-                "option": "Charge from Solar Power",
-            },
-            True,
-        )
-
+    
     async def curtail_solar(self):
         _LOGGER.info("Curtailing solar")
         await self._hass.services.async_call(
@@ -446,38 +336,9 @@ class manage_energy:
 
     async def maximise_self(self):
         _LOGGER.info("Maximising self consumption")
-        await self._hass.services.async_call(
-            "select",
-            "select_option",
-            {
-                "entity_id": "select.solaredge_i1_storage_control_mode",
-                "option": "Maximize Self Consumption",
-            },
-            True,
-        )
+        await self.set_mode(AUTO)
 
-    async def battery_off(self):
-        _LOGGER.info("Charging battery")
-        await self._hass.services.async_call(
-            "select",
-            "select_option",
-            {
-                "entity_id": "select.solaredge_i1_storage_control_mode",
-                "option": "Remote Control",
-            },
-            True,
-        )
-        await asyncio.sleep(5)
-        await self._hass.services.async_call(
-            "select",
-            "select_option",
-            {
-                "entity_id": "select.solaredge_i1_storage_default_mode",
-                "option": "Solar Power Only (Off)",
-            },
-            True,
-        )
-
+   
     async def uncurtail_solar(self):
         _LOGGER.info("Uncurtailing Solar")
         await self._hass.services.async_call(
@@ -532,8 +393,7 @@ class manage_energy:
         return current_month in peak_months and (start_time <= current_time <= end_time)
 
     async def handle_manage_energy(self):
- #temporary until i get round to fixingin for Tesla battery...
-        return
+
         try:
             if self._running :
                 return
@@ -641,7 +501,7 @@ class manage_energy:
 
             isDemandWindow = await self.is_demand_window()
 
-            if await self.auto_mode():
+            if  self._auto:
                 # if i have available energy and the actual is as good as it gets in the next five hours (with margin) or there is a price spike in the next 5 hours and this is one of the best opportunities...
                 if (actuals.available_battery_energy > actuals.battery_min_energy) and (
                     (
@@ -686,7 +546,7 @@ class manage_energy:
 
                 else:
                     if tesla_charging:
-                        await self.charge_from_solar()
+                        await self.preserve_battery()
                         await self.update_status(
                             "Charging from Solar while charging Tesla"
                         )
