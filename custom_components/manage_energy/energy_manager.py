@@ -107,6 +107,7 @@ class manage_energy:
     def name(self) -> str:
         return self._name
 
+    
     async def update_poll_frequency(self, frequency):
         if self._unsub_refresh is not None:
             self._unsub_refresh()
@@ -161,6 +162,8 @@ class manage_energy:
             notify_listeners()
             await self.refresh()
             
+    def get_mode(self) : str
+        return self._mode
 
     async def set_tesla_mode(self, mode):
         self._tesla_mode = mode
