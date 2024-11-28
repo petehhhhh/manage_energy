@@ -5,10 +5,10 @@
 from enum import StrEnum, IntEnum
 DOMAIN = "manage_energy"
 MIN_MARGIN = 0.2
-BATTERY_DISCHARGE_RATE = 5
+BATTERY_DISCHARGE_RATE = 8
 
 
-CURTAIL_BATTERY_LEVEL = 90
+CURTAIL_BATTERY_LEVEL = 95
 
 
 class PowerSelectOptions(StrEnum):
