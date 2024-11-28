@@ -64,7 +64,7 @@ class SolarCurtailmentSwitch(SwitchEntity):
     def unique_id(self) -> str:
         """Return a unique ID."""
         return self._id
-
+    @property
     def available(self) -> bool:
         """Return True if entity is available."""
         return self._available
@@ -133,7 +133,8 @@ class AutoSwitch(SwitchEntity):
     def unique_id(self) -> str:
         """Return a unique ID."""
         return self._id
-
+        
+    @property
     def available(self) -> bool:
         """Return True if entity is available."""
         return self._available
