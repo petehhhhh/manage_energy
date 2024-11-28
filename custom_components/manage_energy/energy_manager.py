@@ -155,8 +155,12 @@ class manage_energy:
         await self.refresh()
 
     async def set_mode(self, mode):
+        old_mode = self._mode
         self._mode = mode
-        await self.refresh()
+        if old_mode != mode:
+            notify_listeners()
+            await self.refresh()
+            
 
     async def set_tesla_mode(self, mode):
         self._tesla_mode = mode
