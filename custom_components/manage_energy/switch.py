@@ -14,6 +14,7 @@ async def async_setup_entry(hass, config_entry, async_add_entities):
         name + "_Auto", config_entry.title + " Auto", hub)]
                        )
 
+
 class SolarCurtailmentSwitch(SwitchEntity):
     """Representation of a switch for solar curtailment."""
     type = "solar curtailment"
