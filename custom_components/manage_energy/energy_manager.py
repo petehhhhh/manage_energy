@@ -416,7 +416,7 @@ class manage_energy:
 
             next6hours = forecasts.amber[0:24]
      
-            discharge_blocks_available = round(actuals.battery_max_usable_energy / BATTERY_DISCHARGE_RATE,0)
+            discharge_blocks_available = int(round(actuals.battery_max_usable_energy / BATTERY_DISCHARGE_RATE,0))
 
             # work out when in next 12 hours we can best use available blocks of discharge
             max_values = sorted(next6hours, reverse=True)[:(discharge_blocks_available)]
