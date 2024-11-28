@@ -45,6 +45,7 @@ class manage_energy:
         self.manufacturer = "Pete"
         self._locked = False
         self._curtailment = False
+        self._auto = True
         self._tesla_amps = 0
 
         self._mode = PowerSelectOptions.AUTO
@@ -127,6 +128,12 @@ class manage_energy:
     async def get_solar_curtailment(self):
         return self._curtailment
 
+    async def get_auto(self):
+        return self._auto
+        
+    async def set_auto(self,state):
+        self._auto = state
+        
     async def async_will_remove_from_hass(self):
         if self._unsub_refresh is not None:
             self._unsub_refresh()
