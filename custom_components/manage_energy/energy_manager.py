@@ -128,7 +128,7 @@ class manage_energy:
     async def get_solar_curtailment(self):
         return self._curtailment
 
-    async def get_auto(self):
+    def get_auto(self):
         return self._auto
         
     async def set_auto(self,state):
