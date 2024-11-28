@@ -67,8 +67,8 @@ class SolarCurtailmentSwitch(SwitchEntity):
         return self._id
     @property
     def available(self) -> bool:
-        """Return True if entity is available."""
-        return not self._hub.is_auto()
+        """Return True if auto mode not enabled."""
+        return not await self._hub.get_auto()
 
     async def async_turn_on(self, **kwargs):
         """Turn the switch on."""
@@ -92,8 +92,8 @@ class AutoSwitch(SwitchEntity):
 
     def __init__(self, name, title, hub):
         self._id = name
-        self._state = True
         self._hub = hub
+        self._state = await self._hub.get_auto()
         self._name = title
         self._icon = "mdi:power-plug"
         self._available = True
@@ -128,6 +128,7 @@ class AutoSwitch(SwitchEntity):
     @property
     def is_on(self):
         """Return true if switch is on."""
+        self._state = await self._hub.get_auto()
         return self._state
 
     @property
