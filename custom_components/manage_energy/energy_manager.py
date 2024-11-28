@@ -304,15 +304,15 @@ class manage_energy:
 
     async def discharge_battery(self):
         _LOGGER.info("Discharging battery")
-        await self.set_mode(DISCHARGE)
+        await self.set_mode(PowerSelectOptions.DISCHARGE)
         
     async def preserve_battery(self):
         _LOGGER.info("Preserving battery - top up from Solar if available")
-        await self.set_mode(OFF)
+        await self.set_mode(PowerSelectOptions.OFF)
     
     async def charge_battery(self):
         _LOGGER.info("Charging battery")
-        await self.set_mode(CHARGE)
+        await self.set_mode(PowerSelectOptions.CHARGE)
 
     
     async def curtail_solar(self):
@@ -336,7 +336,7 @@ class manage_energy:
 
     async def maximise_self(self):
         _LOGGER.info("Maximising self consumption")
-        await self.set_mode(AUTO)
+        await self.set_mode(PowerSelectOptions.MAXIMISE)
 
    
     async def uncurtail_solar(self):
