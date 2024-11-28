@@ -1,6 +1,7 @@
 from .const import DOMAIN, PowerSelectOptions, TeslaModeSelectOptions
 from homeassistant.components.select import SelectEntity
 from .energy_manager import manage_energy
+from homeassistant.core import callback
 
 
 async def async_setup_entry(hass, config_entry, async_add_entities):
