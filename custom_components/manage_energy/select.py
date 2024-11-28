@@ -20,7 +20,7 @@ class BaseSelect(SelectEntity):
         self._state = None
         self._icon = "mdi:menu"
         self._unique_id = f"{self._hub.hub_id}-{self._id}"
-        self._available = True
+        self._available = self._hub.get_auto()
         self._enabled = True
         self._state = self._options[0]
         self._attr_options = list(self._options)
@@ -94,7 +94,7 @@ class BaseSelect(SelectEntity):
     def set_available(self, available: bool) -> None:
         """Set availability."""
         self._available = available
-        self.async_write_ha_state()
+       
 
 
 class TeslaModeSelect(BaseSelect):
@@ -124,6 +124,14 @@ class PowerModeSelect(BaseSelect):
         self._options = [option.value for option in PowerSelectOptions]
         super().__init__(select_id, name, hub)
 
+
+    @property
+    def available(self) -> bool:
+    """ Return True if auto mode not enable..."""
+        self._available = not self._hub.get_auto()
+        return self._available
+
+    
     async def async_select_option(self, option: str) -> None:
         """Change the selected option."""
         self._state = option
