@@ -48,7 +48,7 @@ class manage_energy:
         self._auto = True
         self._tesla_amps = 0
 
-        self._mode = PowerSelectOptions.AUTO
+        self._mode = PowerSelectOptions.MAXIMISE
         self._tesla_mode = TeslaModeSelectOptions.AUTO
         self._id = host.lower()
         _LOGGER.info(
@@ -491,7 +491,7 @@ class manage_energy:
         )
 
     async def auto_mode(self) -> bool:
-        if self._mode == PowerSelectOptions.AUTO:
+        if self._auto
             return True
         elif self._mode == PowerSelectOptions.DISCHARGE:
             await self.discharge_battery()
