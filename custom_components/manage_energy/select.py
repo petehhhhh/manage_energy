@@ -124,10 +124,10 @@ class PowerModeSelect(BaseSelect):
         self._options = [option.value for option in PowerSelectOptions]
         super().__init__(select_id, name, hub)
 
-
     @property
     def available(self) -> bool:
-        """ Return True if auto mode not enable..."""
+    # Return True if auto mode not enable...
+        if set
         self._available = not self._hub.get_auto()
         return self._available
 
