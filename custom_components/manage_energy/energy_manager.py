@@ -491,7 +491,7 @@ class manage_energy:
         )
 
     async def auto_mode(self) -> bool:
-        if self._auto
+        if self._auto:
             return True
         elif self._mode == PowerSelectOptions.DISCHARGE:
             await self.discharge_battery()
