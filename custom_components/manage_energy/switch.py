@@ -9,8 +9,8 @@ async def async_setup_entry(hass, config_entry, async_add_entities):
     hub = hass.data[DOMAIN][config_entry.entry_id]
     name = config_entry.data["host"]
     async_add_entities([SolarCurtailmentSwitch(
-        name + "_SolarCurtailment", config_entry.title + " Solar Curtailmet", hub)],
-                       [AutoSwitch(
+        name + "_SolarCurtailment", config_entry.title + " Solar Curtailment", hub),
+                       AutoSwitch(
         name + "_Auto", config_entry.title + " Auto", hub)]
                        )
 
