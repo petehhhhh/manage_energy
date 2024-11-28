@@ -142,3 +142,15 @@ class PowerModeSelect(BaseSelect):
             await self._hub.set_mode(option)
         finally:
             self.set_available(True)
+    
+    async def async_added_to_hass(self):
+        """Handle when the entity is added to Home Assistant."""
+        @callback
+        def async_auto_switch_state_listener(event):
+            """React to changes in the auto_switch state."""
+            self.async_schedule_update_ha_state()
+
+        # Listen for changes in the auto_switch state
+        self._hass.bus.async_listen(
+            "state_changed", async_auto_switch_state_listener)
+        
