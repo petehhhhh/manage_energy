@@ -27,16 +27,17 @@ class Actuals:
         self.price = self.get_entity_state("sensor.amber_general_price")
         self.feedin = self.get_entity_state("sensor.amber_feed_in_price")
         self.battery_pct_level = self.get_entity_state(
-            "sensor.solaredge_b1_state_of_energy"
-        )
-        self.battery_max_usable_energy = self.get_entity_state(
-            "sensor.solaredge_b1_available_energy"
+            "sensor.home_battery"
         )
         self.battery_max_energy = self.get_entity_state(
-            "sensor.solaredge_b1_maximum_energy"
-        )
+            "sensor.battery1_battery_capacity") + self.get_entity_state(
+            "sensor.battery2_battery_capacity") 
+        
+        self.battery_max_usable_energy = self.battery_max_usable_energy * 0.97
+        # assume 3% reserve on battery.
+        
         self.solar = self.get_entity_state("sensor.power_solar_generation")
-        self.battery_charge_rate = self.get_entity_state("sensor.solaredge_b1_dc_power")
+        self.battery_charge_rate = self.get_entity_state("sensor.home_load_import") * -1
         self.consumption = self.get_entity_state("sensor.power_consumption")
         self.curtailed =  (self._hass.states.get("select.solaredge_i1_limit_control_mode").state != "Disabled")
         self.excess_energy = self.solar - self.consumption - self.battery_charge_rate
