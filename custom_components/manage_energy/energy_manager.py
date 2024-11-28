@@ -159,7 +159,7 @@ class manage_energy:
         old_mode = self._mode
         self._mode = mode
         if old_mode != mode:
-            notify_listeners()
+            self.notify_listeners()
             await self.refresh()
             
     def get_mode(self) -> str:
