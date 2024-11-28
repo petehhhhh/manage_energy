@@ -86,7 +86,7 @@ class SolarCurtailmentSwitch(SwitchEntity):
         self._state = await self._hub.get_solar_curtailment()
         
 class AutoSwitch(SwitchEntity):
-    """Representation of a switch for solar curtailment."""
+    """Representation of a switch to control whether Auto mode is on and Manage Energy controls battery charge/discharge."""
     type = "Auto Power Management"
 
     def __init__(self, name, title, hub):
@@ -103,3 +103,38 @@ class AutoSwitch(SwitchEntity):
             "manufacturer": self._hub.manufacturer,
             "model": "Energy Manager"}
         self.enabled_by_default = True
+        
+    @property
+    def unique_id(self) -> str:
+        """Return a unique ID."""
+        return self._id
+
+    @property
+    def device_info(self) -> dict:
+        """Return device information about this entity."""
+        return self._device_info
+
+    @property
+    def device_state_attributes(self) -> dict:
+        """Return the state attributes."""
+        return self._attributes
+
+    @property
+    def name(self):
+        """Return the name of the switch."""
+        return self._name
+
+    @property
+    def is_on(self):
+        """Return true if switch is on."""
+        return self._state
+
+    @property
+    def unique_id(self) -> str:
+        """Return a unique ID."""
+        return self._id
+
+    def available(self) -> bool:
+        """Return True if entity is available."""
+        return self._available
+
