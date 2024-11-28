@@ -68,7 +68,7 @@ class SolarCurtailmentSwitch(SwitchEntity):
     @property
     def available(self) -> bool:
         """Return True if entity is available."""
-        return self._available
+        return not self._hub.is_auto()
 
     async def async_turn_on(self, **kwargs):
         """Turn the switch on."""
