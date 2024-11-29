@@ -3,13 +3,12 @@ from .const import (
     CURTAIL_BATTERY_LEVEL,
     DOMAIN,
     PowerSelectOptions,
+    MAX_BATTERY_LEVEL,
     TeslaModeSelectOptions,
 )
 
-import time
 import logging
 import datetime
-import asyncio
 import traceback
 from pytz import timezone
 from homeassistant.core import HomeAssistant, StateMachine  # type: ignore
@@ -240,6 +239,41 @@ class manage_energy:
         end_time = datetime.time(21, 0, 0)
         return current_month in peak_months and (start_time <= current_time <= end_time)
 
+    def should_i_charge_as_not_enough_solar(self) -> bool:
+        """Works out whether now is a good time to charge battery if going to be importing in the next forecast window."""
+        actuals = self.actuals
+        FORECAST_WINDOW = 24
+        # half an hour blocks it will take to charge...
+        blocks_to_charge = (
+            int(
+                round(
+                    (1 - (actuals.battery_pct_level / 100))
+                    * actuals.battery_max_usable_energy
+                    / BATTERY_DISCHARGE_RATE,
+                    0,
+                )
+            )
+            * 2
+        )
+        # if in the next six hours i am going to be exporting energy...
+
+        if min(self.forecasts.export[0:FORECAST_WINDOW]) < 0:
+            if (
+                (
+                    actuals.feedin
+                    <= max(
+                        sorted(self.forecasts.amber[0:FORECAST_WINDOW])[
+                            :blocks_to_charge
+                        ]
+                    )
+                )
+                and actuals.battery_pct_level < MAX_BATTERY_LEVEL
+                and not self.is_demand_window()
+            ):
+                return True
+
+        return False
+
     async def handle_manage_energy(self):
         try:
             if self._running:
@@ -253,11 +287,14 @@ class manage_energy:
 
             forecasts = self.forecasts
             await forecasts.build()
-            HOURBLOCKS = 24
-            next12hours = forecasts.amber[0:HOURBLOCKS]
+            TTL_FORECAST_BLOCKS = 24
+            next12hours = forecasts.amber[0:TTL_FORECAST_BLOCKS]
 
-            discharge_blocks_available = int(
-                round(actuals.battery_max_usable_energy / BATTERY_DISCHARGE_RATE, 0)
+            discharge_blocks_available = (
+                int(
+                    round(actuals.battery_max_usable_energy / BATTERY_DISCHARGE_RATE, 0)
+                )
+                * 2
             )
 
             # work out when in next 12 hours we can best use available blocks of discharge
@@ -380,8 +417,8 @@ class manage_energy:
 
                 # charge battery if prices rising in the next 6 hours and we will be importing energy at the end of the max period
                 elif (
-                    actuals.feedin * 1.3 < max(next12hours[0:HOURBLOCKS])
-                    and actuals.feedin <= min(next12hours[0:HOURBLOCKS])
+                    actuals.feedin * 1.3 < max(next12hours[0:TTL_FORECAST_BLOCKS])
+                    and actuals.feedin <= min(next12hours[0:TTL_FORECAST_BLOCKS])
                     and start_high_prices != None
                     and end_high_prices != None
                     and forecasts.export[end_high_prices] < 0
@@ -394,11 +431,17 @@ class manage_energy:
                         + start_str
                     )
 
+                elif self.should_i_charge_as_not_enough_solar():
+                    await self.charge_battery()
+                    await self.update_status(
+                        "Charging battery as cheap time to charge" + start_str
+                    )
+
                 elif (
                     len(max_values) > 0
                     and actuals.price + scaled_min_margin < (max_values[0] * 0.9)
                     and battery_at_peak < actuals.battery_max_energy
-                    and actuals.battery_pct_level < 100
+                    and actuals.battery_pct_level < MAX_BATTERY_LEVEL
                 ):
                     await self.update_status(
                         "Making sure battery charged for upcoming price spike at "
@@ -407,20 +450,18 @@ class manage_energy:
                     )
                     await self.charge_battery()
 
+            else:
+                if tesla_charging:
+                    await self.preserve_battery()
+                    await self.update_status("Charging from Solar while charging Tesla")
                 else:
-                    if tesla_charging:
-                        await self.preserve_battery()
+                    if not insufficient_margin:
                         await self.update_status(
-                            "Charging from Solar while charging Tesla"
+                            "Maximising current usage. Next peak at " + start_str
                         )
                     else:
-                        if not insufficient_margin:
-                            await self.update_status(
-                                "Maximising current usage. Next peak at " + start_str
-                            )
-                        else:
-                            await self.update_status("Maximising current usage.")
-                        await self.maximise_self()
+                        await self.update_status("Maximising current usage.")
+                    await self.maximise_self()
 
             if (
                 not tesla_charging

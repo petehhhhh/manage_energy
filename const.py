@@ -3,25 +3,26 @@
 # This is the internal name of the integration, it should also match the directory
 # name for the integration.
 from enum import StrEnum, IntEnum
+
 DOMAIN = "manage_energy"
 MIN_MARGIN = 0.2
 BATTERY_DISCHARGE_RATE = 8
-
-
 CURTAIL_BATTERY_LEVEL = 95
+MAX_BATTERY_LEVEL = 99
 
 
 class PowerSelectOptions(StrEnum):
     """Power select options."""
+
     MAXIMISE = "Maximise Self"
     DISCHARGE = "Discharge"
     CHARGE = "Charge"
     OFF = "Solar only (off)"
 
 
-
 class TeslaModeSelectOptions(StrEnum):
     """Tesla mode select options."""
+
     AUTO = "Auto"
     CHEAP_GRID = "Charge from Cheap Grid and Solar"
     FAST_GRID = "Fast Charge from Grid"
@@ -39,6 +40,7 @@ class ConfName(StrEnum):
 
 class ConfDefaultInt(IntEnum):
     """Defaults for options that are booleans."""
+
     POLLING_FREQUENCY = 60
     MINIMUM_MARGIN = 15
     CHEAP_PRICE = 5
