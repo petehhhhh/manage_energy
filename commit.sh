@@ -12,7 +12,13 @@ if [ -z "$COMMIT_MESSAGE" ]; then
   exit 1
 fi
 
-# Step 1: Auto-increment version
+# Step 1: Pull remote changes
+cd $REPO_PATH
+echo "Pulling the latest changes from the remote repository..."
+git fetch origin main
+git pull --rebase origin main
+
+# Step 2: Auto-increment version
 if [ -f "$HACS_FILE" ]; then
   CURRENT_VERSION=$(jq -r ".version" "$HACS_FILE")
   if [ -z "$CURRENT_VERSION" ] || [ "$CURRENT_VERSION" = "null" ]; then
@@ -34,15 +40,20 @@ else
   exit 1
 fi
 
-# Step 2: Commit, tag, and push changes
-cd $REPO_PATH
+# Step 3: Commit, tag, and push changes
+echo "Staging changes..."
 git add .
+echo "Committing changes with message: Release v$NEW_VERSION: $COMMIT_MESSAGE"
 git commit -m "Release v$NEW_VERSION: $COMMIT_MESSAGE"
+
+echo "Creating a new tag: v$NEW_VERSION"
 git tag -a "v$NEW_VERSION" -m "$COMMIT_MESSAGE"
+
+echo "Pushing changes and tags to the remote repository..."
 git push origin main
 git push origin "v$NEW_VERSION"
 
-# Step 3: Create GitHub release using GitHub CLI (gh)
+# Step 4: Create GitHub release using GitHub CLI (gh)
 echo "Creating GitHub release..."
 gh release create "v$NEW_VERSION" --title "v$NEW_VERSION" --notes "$COMMIT_MESSAGE"
 
