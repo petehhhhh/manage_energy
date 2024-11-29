@@ -450,10 +450,10 @@ class manage_energy:
                     )
                     await self.charge_battery()
 
-            else:
-                if tesla_charging:
+                elif tesla_charging:
                     await self.preserve_battery()
                     await self.update_status("Charging from Solar while charging Tesla")
+
                 else:
                     if not insufficient_margin:
                         await self.update_status(
