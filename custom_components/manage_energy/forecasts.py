@@ -20,30 +20,29 @@ _LOGGER = logging.getLogger(__name__)
 
 
 class Actuals:
-    def __init__(self, hass) -> None:
-        self._hass = hass
+    def __init__(self, hub) -> None:
+        self._hass = hub.hass
+        self._hub = hub
 
     def refresh(self):
         self.price = self.get_entity_state("sensor.amber_general_price")
         self.feedin = self.get_entity_state("sensor.amber_feed_in_price")
-        self.battery_pct_level = self.get_entity_state(
-            "sensor.home_battery"
-        )
+        self.battery_pct_level = self.get_entity_state("sensor.home_battery")
         self.battery_max_energy = self.get_entity_state(
-            "sensor.battery1_battery_capacity") + self.get_entity_state(
-            "sensor.battery2_battery_capacity") 
-        
+            "sensor.battery1_battery_capacity"
+        ) + self.get_entity_state("sensor.battery2_battery_capacity")
+
         # assume 3% reserve on battery.
         self.battery_max_usable_energy = self.battery_max_energy * 0.97
-        
-        self.solar = self.get_entity_state("sensor.power_solar_generation")
+
+        self.solar = self.get_entity_state("sensor.home_solar_power")
         self.battery_charge_rate = self.get_entity_state("sensor.home_load_import") * -1
-        self.consumption = self.get_entity_state("sensor.power_consumption")
-        self.curtailed =  (self._hass.states.get("select.solaredge_i1_limit_control_mode").state != "Disabled")
+        self.consumption = self.get_entity_state("sensor.home_site_power")
+        self.curtailed = self._hub.curtailment
         self.excess_energy = self.solar - self.consumption - self.battery_charge_rate
-        if self.curtailed :
+        if self.curtailed:
             self.excess_energy += self.solar
-       
+
         self.available_battery_energy = (
             self.battery_max_energy * self.battery_pct_level / 100
         ) - (self.battery_max_energy - self.battery_max_usable_energy)
@@ -57,7 +56,7 @@ class Actuals:
         val = self._hass.states.get(entity_id)
         val = val.state
         if val is None or val == "unavailable":
-            raise RuntimeError("Solaredge unavailable")
+            raise RuntimeError("Entity Unavailable:" + entity_id)
         if attribute is not None:
             val = val.attributes[attribute]
 
@@ -65,9 +64,9 @@ class Actuals:
 
 
 class Forecasts:
-    def __init__(self, hass, actuals) -> None:
-        self._hass = hass
-        self._actuals = actuals
+    def __init__(self, hub) -> None:
+        self._hass = hub.hass
+        self._actuals = hub.actuals
         self._listeners = []
         self.history = []
         self.amber = []
@@ -78,7 +77,7 @@ class Forecasts:
         self.battery_energy = []
         self.export = []
         self.forecast_data = None
-        self.recorder = get_instance(hass)
+        self.recorder = get_instance(self._hass)
 
     def add_listener(self, callback):
         """Add a listener that will be notified when the state changes."""

@@ -12,11 +12,12 @@ import datetime
 import asyncio
 import traceback
 from pytz import timezone
-from homeassistant.core import HomeAssistant, StateMachine # type: ignore
-from homeassistant.components.recorder import get_instance # type: ignore
-from homeassistant.components.recorder.history import state_changes_during_period # type: ignore
-from homeassistant.helpers.event import async_track_time_interval, async_call_later # type: ignore
+from homeassistant.core import HomeAssistant, StateMachine  # type: ignore
+from homeassistant.components.recorder import get_instance  # type: ignore
+from homeassistant.components.recorder.history import state_changes_during_period  # type: ignore
+from homeassistant.helpers.event import async_track_time_interval, async_call_later  # type: ignore
 from .forecasts import Forecasts, Actuals
+from .tesla import TeslaCharging
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -41,7 +42,7 @@ class manage_energy:
         self._host = host
         self._name = host
         self._poll_frequency = int(poll_frequency)
-        self._minimum_margin = float(minimum_margin) / 100
+        self.minimum_margin = float(minimum_margin) / 100
         self._cheap_price = cheap_price / 100
         self.manufacturer = "Pete"
         self._locked = False
@@ -56,15 +57,15 @@ class manage_energy:
             "Setting up polling for every " + str(self._poll_frequency) + " seconds"
         )
         _LOGGER.info(
-            "Minimum margin set to " + str(int(self._minimum_margin * 100)) + " cents"
+            "Minimum margin set to " + str(int(self.minimum_margin)) + " cents"
         )
         self._unsub_refresh = async_track_time_interval(
             self._hass,
             self.refresh_interval,
             datetime.timedelta(seconds=self._poll_frequency),
         )
-        self.actuals = Actuals(hass)
-        self.forecasts = Forecasts(hass, self.actuals)
+        self.actuals = Actuals(self)
+        self.forecasts = Forecasts(self)
 
     def set_cheap_price(self, value):
         self._cheap_price = value / 100
@@ -96,7 +97,18 @@ class manage_energy:
         self._notify_listeners()
 
     @property
+    def hass(self):
+        """Hass object."""
+        return self._hass
+
+    @property
+    def curtailment(self) -> bool:
+        """Curtail solar."""
+        return self._curtailment
+
+    @property
     def state(self) -> str:
+        """Current state of Manage Energy."""
         return self._state
 
     @property
@@ -107,7 +119,6 @@ class manage_energy:
     def name(self) -> str:
         return self._name
 
-    
     async def update_poll_frequency(self, frequency):
         if self._unsub_refresh is not None:
             self._unsub_refresh()
@@ -132,10 +143,11 @@ class manage_energy:
 
     def get_auto(self):
         return self._auto
-        
-    async def set_auto(self,state):
+
+    async def set_auto(self, state):
         self._auto = state
-        
+        await self.refresh()
+
     async def async_will_remove_from_hass(self):
         if self._unsub_refresh is not None:
             self._unsub_refresh()
@@ -161,202 +173,31 @@ class manage_energy:
         if old_mode != mode:
             self._notify_listeners()
             await self.refresh()
-            
+
     def get_mode(self) -> str:
         return self._mode
-
-    async def set_tesla_mode(self, mode):
-        self._tesla_mode = mode
-        await self._hass.services.async_call(
-            "button", "press", {"entity_id": "button.pete_s_tesla_force_data_update"}
-        )
-
-        await self.refresh()
-
-    async def tesla_charging(self, forecasts):
-        _LOGGER.info("Checking whether to charge Tesla")
-        # Turn Tesla charging on if the plugged in and at home.
-        try:
-
-            tesla_home = (
-                self._hass.states.get("binary_sensor.pete_s_tesla_presence").state == "on"
-            )
-            cheap_price = float(self._hass.states.get("input_number.cheap_grid_price").state) / 100
-
-            tesla_charger_door_closed = not (
-                self._hass.states.get("cover.pete_s_tesla_via_fleet_charger_door").state
-                == "open"
-            )
-
-            if  tesla_charger_door_closed or not tesla_home:
-                return False
-
-            tesla_charging = (
-                self._hass.states.get("binary_sensor.pete_s_tesla_via_fleet_charging").state
-                == "on"
-            )
-            charge_limit = int(
-                self._hass.states.get("number.pete_s_tesla_via_fleet_charge_limit").state
-            )
-            current_amps = int(
-                self._hass.states.get("number.pete_s_tesla_via_fleet_charging_amps").state
-            )
-
-            current_charge = int(
-                self._hass.states.get("sensor.pete_s_tesla_via_fleet_battery").state
-            )
-
-
-            isDemandWindow = await self.is_demand_window()
-
-            if (
-                self._tesla_mode == TeslaModeSelectOptions.FAST_GRID
-                or (
-                    (self.actuals.price <= cheap_price and self._tesla_mode == TeslaModeSelectOptions.CHEAP_GRID)
-                    or self.actuals.price <= 0
-                )
-                and not isDemandWindow
-            ):
-                charge_amps = 16
-            else:
-                if self.actuals.feedin <= cheap_price:
-                    charge_amps = round(self.actuals.excess_energy * 1000 / 240 / 3, 0)
-                    if tesla_charging  :
-                          charge_amps += self._tesla_amps
-                    if charge_amps < 0 :
-                        charge_amps = 0
-                elif self.actuals.feedin > cheap_price:
-                    charge_amps = 0
-
-
-            if charge_limit > current_charge and charge_amps > 0:
-
-                await self._hass.services.async_call(
-                        "number",
-                        "set_value",
-                        {
-                            "entity_id": " number.pete_s_tesla_charging_amps",
-                            "value": charge_amps,
-                        },
-                        True,
-                    )
-                self._tesla_amps = charge_amps
-
-                await self._hass.services.async_call(
-                        "switch",
-                        "turn_on",
-                        {"entity_id": "switch.pete_s_tesla_charger"},
-                        True,
-                    )
-                await self.update_status(
-                    "Charging Tesla at " + str(charge_amps) + " amps"
-                )
-                return True
-            else:
-                if charge_limit <= current_charge:
-                    await self.update_status(
-                        "Tesla: charge limit reached."
-                    )
-                elif (
-                    self.actuals.price > self._cheap_price
-                    and self._tesla_mode == TeslaModeSelectOptions.CHEAP_GRID
-                ):
-                    await self.update_status(
-                        "Tesla: Grid price over maximum of "
-                        + str(self._cheap_price)
-                        + " cents."
-                    )
-                else:
-                  if isDemandWindow and self._tesla_mode == TeslaModeSelectOptions.CHEAP_GRID and self.actuals.price <= cheap_price:
-                      await self.update_status(
-                            "Tesla: In demand window."
-                      )
-                  elif self.actuals.feedin <= cheap_price:
-                        await self.update_status(
-                            "Tesla: No excess solar."
-                        )
-                  else:
-                    await self.update_status(
-                        "Tesla: Feed in over cheap price."
-                    )
-
-                await self._hass.services.async_call(
-                        "switch",
-                        "turn_off",
-                        {"entity_id": "switch.pete_s_tesla_charger"},
-                        True,
-                    )
-                if current_amps != 16:
-                    await self._hass.services.async_call(
-                        "number",
-                        "set_value",
-                        {
-                            "entity_id": " number.pete_s_tesla_charging_amps",
-                            "value": 16,
-                        },
-                        True,
-                    )
-
-            return False
-
-        except Exception as e:
-            msg = str(e)
-            await self.update_status("Error in Tesla_Charging. Error : " + msg)
-            error_message = traceback.format_exc()
-            # Log the error with the traceback
-            _LOGGER.error(
-                f"Error in Tesla_Charging: {msg}. Traceback:\n {error_message}\n\n"
-            )
-            return False
 
     async def discharge_battery(self):
         _LOGGER.info("Discharging battery")
         await self.set_mode(PowerSelectOptions.DISCHARGE)
-        
+
     async def preserve_battery(self):
         _LOGGER.info("Preserving battery - top up from Solar if available")
         await self.set_mode(PowerSelectOptions.OFF)
-    
+
     async def charge_battery(self):
         _LOGGER.info("Charging battery")
         await self.set_mode(PowerSelectOptions.CHARGE)
 
-    
     async def curtail_solar(self):
         _LOGGER.info("Curtailing solar")
-        await self._hass.services.async_call(
-            "select",
-            "select_option",
-            {
-                "entity_id": "select.solaredge_i1_limit_control_mode",
-                "option": "Export Control (Export/Import Meter)",
-            },
-            True,
-        )
-        await asyncio.sleep(5)
-        await self._hass.services.async_call(
-            "number",
-            "set_value",
-            {"entity_id": "number.solaredge_i1_site_limit", "value": "0"},
-            True,
-        )
 
     async def maximise_self(self):
         _LOGGER.info("Maximising self consumption")
         await self.set_mode(PowerSelectOptions.MAXIMISE)
 
-   
     async def uncurtail_solar(self):
         _LOGGER.info("Uncurtailing Solar")
-        await self._hass.services.async_call(
-            "select",
-            "select_option",
-            {
-                "entity_id": "select.solaredge_i1_limit_control_mode",
-                "option": "Disabled",
-            },
-            True,
-        )
 
     async def auto_mode(self) -> bool:
         if self._auto:
@@ -400,9 +241,8 @@ class manage_energy:
         return current_month in peak_months and (start_time <= current_time <= end_time)
 
     async def handle_manage_energy(self):
-
         try:
-            if self._running :
+            if self._running:
                 return
             self._running = True
             await self.clear_status()
@@ -413,44 +253,48 @@ class manage_energy:
 
             forecasts = self.forecasts
             await forecasts.build()
+            HOURBLOCKS = 24
+            next12hours = forecasts.amber[0:HOURBLOCKS]
 
-            next6hours = forecasts.amber[0:24]
-     
-            discharge_blocks_available = int(round(actuals.battery_max_usable_energy / BATTERY_DISCHARGE_RATE,0))
+            discharge_blocks_available = int(
+                round(actuals.battery_max_usable_energy / BATTERY_DISCHARGE_RATE, 0)
+            )
 
             # work out when in next 12 hours we can best use available blocks of discharge
-            max_values = sorted(next6hours, reverse=True)[:(discharge_blocks_available)]
+            max_values = sorted(next12hours, reverse=True)[
+                :(discharge_blocks_available)
+            ]
 
             # get rid of max values that are less than the minimum margin
             max_values = [
-                x for x in max_values if x > (min(next6hours) + self._minimum_margin)
+                x for x in max_values if x > (min(next12hours) + self.minimum_margin)
             ]
 
             # find  when high prices start
             start_high_prices = None
-            for index, value in enumerate(next6hours):
+            for index, value in enumerate(next12hours):
                 if value in max_values:
                     start_high_prices = index
                     break
 
-            # now find the first entry that is 0.2 less than this - this is the minimum margin to export to grid. Trim the max values to ensure there is sufficient margin
+            # now find the first entry that has the minimum margin to export to grid. Trim the max values to ensure there is sufficient margin
             insufficient_margin = True
             end_high_prices = None
             for index1, value1 in enumerate(max_values):
                 end_high_prices = None
-                for index, value in enumerate(next6hours):
+                for index, value in enumerate(next12hours):
                     # if this entry is after the start of high prices and it is less than this value less required margin...
                     if (index > start_high_prices) and (
-                        value <= (value1 - self._minimum_margin)
+                        (value + self.minimum_margin) <= value1
                     ):
                         end_high_prices = index
                         insufficient_margin = False
                         break
 
-                if index1 == 0 and end_high_prices == None:
+                if index1 == 0 and end_high_prices is None:
                     # the max value in the array has too little margin
                     break
-                elif end_high_prices == None:
+                elif end_high_prices is None:  # noqa: RET508
                     # the last value in the max series doesn't have enough margin. Probably shouldnt happen as check above...
                     max_values = max_values[:(index1)]
                     end_high_prices = last_end_high_prices
@@ -461,19 +305,19 @@ class manage_energy:
 
             # if we didn't find one then check that the current price is the tail of the peak
             available_max_values = None
-            if end_high_prices == None:
-                if actuals.feedin >= (next6hours[0] + self._minimum_margin):
+            if end_high_prices is None:
+                if actuals.feedin >= (next12hours[0] + self.minimum_margin):
                     insufficient_margin = False
                 else:
                     insufficient_margin = True
             else:
                 # failsafe as can get abberations in data - don't discharge if current price isn't greater than the minimum margin over next 5 hours
-                if actuals.feedin < (min(next6hours) + self._minimum_margin):
+                if actuals.feedin < (min(next12hours) + self.minimum_margin):
                     insufficient_margin = True
                 # to give us how many blocks of high prices we have
                 blocks_till_price_drops = end_high_prices - start_high_prices
 
-                # recalculate actual half hour blocks of discharge available at 5kw rated energy less enough battery to cover consumption
+                # recalculate actual half hour blocks of discharge available less enough battery to cover consumption
                 available_max_values = max_values
                 energy_to_discharge = float(
                     actuals.available_battery_energy
@@ -490,7 +334,7 @@ class manage_energy:
                 if len(
                     available_max_values
                 ) < discharge_blocks_available and actuals.feedin >= (
-                    min(next6hours) + self._minimum_margin
+                    min(next12hours) + self.minimum_margin
                 ):
                     available_max_values.append(actuals.feedin)
 
@@ -503,20 +347,29 @@ class manage_energy:
                 start_time = forecasts.format_date(start_time)
                 start_str = start_time.strftime("%I:%M%p")
             await self.clear_status()
-            
-            tesla_charging = await self.tesla_charging(forecasts)
+
+            tesla = TeslaCharging(self)
+
+            tesla_charging = await tesla.tesla_charging(forecasts)
             # Now we can now make a decision if we start to feed in...
 
             isDemandWindow = await self.is_demand_window()
+            # scaled minimum margin to avoid eg charging at $15 when it is forecast to be $15.50... High risk of disappointment...
+            if actuals.feedin > 0.5:
+                scaled_min_margin = self.minimum_margin / 0.20 * actuals.feedin
+            else:
+                scaled_min_margin = self.minimum_margin
 
-            if  self._auto:
+            if self._auto:
                 # if i have available energy and the actual is as good as it gets in the next five hours (with margin) or there is a price spike in the next 5 hours and this is one of the best opportunities...
                 if (actuals.available_battery_energy > actuals.battery_min_energy) and (
                     (
+                        # if it is currently 90% of the maximum forecsated and there is acceptable margin then take it !
                         actuals.feedin
-                        >= (0.9 * max(next6hours[0:5]) + self._minimum_margin)
+                        >= (0.9 * float(max(next12hours[0:10]) + self.minimum_margin))
                     )
                     or (
+                        # otherwise if it is moire than the max values (that already are calced with minimum margin)
                         available_max_values != None
                         and len(available_max_values) > 0
                         and actuals.feedin >= 0.9 * min(available_max_values)
@@ -524,15 +377,16 @@ class manage_energy:
                 ):
                     await self.update_status("Discharging into Price Spike")
                     await self.discharge_battery()
-                    
+
                 # charge battery if prices rising in the next 6 hours and we will be importing energy at the end of the max period
                 elif (
-                    actuals.feedin * 1.3 < max(next6hours[0:12])
-                    and actuals.feedin <= min(next6hours[0:12])
+                    actuals.feedin * 1.3 < max(next12hours[0:HOURBLOCKS])
+                    and actuals.feedin <= min(next12hours[0:HOURBLOCKS])
                     and start_high_prices != None
                     and end_high_prices != None
                     and forecasts.export[end_high_prices] < 0
                     and actuals.battery_pct_level < 99
+                    and not isDemandWindow
                 ):
                     await self.charge_battery()
                     await self.update_status(
@@ -542,7 +396,7 @@ class manage_energy:
 
                 elif (
                     len(max_values) > 0
-                    and actuals.price < ((max_values[0] * 0.9) - self._minimum_margin)
+                    and actuals.price + scaled_min_margin < (max_values[0] * 0.9)
                     and battery_at_peak < actuals.battery_max_energy
                     and actuals.battery_pct_level < 100
                 ):
@@ -572,7 +426,7 @@ class manage_energy:
                 not tesla_charging
                 and actuals.battery_pct_level >= CURTAIL_BATTERY_LEVEL
                 and actuals.feedin < 0
-            ) or self._curtailment:
+            ):
                 await self.curtail_solar()
                 await self.update_status("Curtailing solar")
             else:
@@ -582,5 +436,5 @@ class manage_energy:
             error_details = traceback.format_exc()
             await self.update_status("Error: " + str(e))
             raise RuntimeError("Error in handle_manage_energy: " + str(e))
-        finally :
+        finally:
             self._running = False

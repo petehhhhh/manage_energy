@@ -3,27 +3,34 @@ from homeassistant.core import HomeAssistant
 from .energy_manager import manage_energy
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from .const import DOMAIN
+from homeassistant.core import callback
 
 
 async def async_setup_entry(hass, config_entry, async_add_entities):
     hub = hass.data[DOMAIN][config_entry.entry_id]
     name = config_entry.data["host"]
-    async_add_entities([SolarCurtailmentSwitch(
-        name + "_SolarCurtailment", config_entry.title + " Solar Curtailment", hub),
-                       AutoSwitch(
-        name + "_Auto", config_entry.title + " Auto", hub)]
-                       )
+    async_add_entities(
+        [
+            SolarCurtailmentSwitch(
+                name + "_SolarCurtailment",
+                config_entry.title + " Solar Curtailment",
+                hub,
+            ),
+            AutoSwitch(name + "_Auto", config_entry.title + " Auto", hub),
+        ]
+    )
 
 
 class SolarCurtailmentSwitch(SwitchEntity):
     """Representation of a switch for solar curtailment."""
+
     type = "solar curtailment"
 
     def __init__(self, name, title, hub):
-
         self._id = name
         self._state = False
         self._hub = hub
+
         self._name = title
         self._icon = "mdi:power-plug"
         self._available = True
@@ -32,13 +39,14 @@ class SolarCurtailmentSwitch(SwitchEntity):
             "identifiers": {(DOMAIN, self._hub.hub_id)},
             "name": self._name,
             "manufacturer": self._hub.manufacturer,
-            "model": "Energy Manager"}
+            "model": "Energy Manager",
+        }
         self.enabled_by_default = True
 
         self._attributes = {
             "friendly_name": self._name,
             "icon": self._icon,
-            "unique_id": self._unique_id
+            "unique_id": self._unique_id,
         }
 
     @property
@@ -59,16 +67,18 @@ class SolarCurtailmentSwitch(SwitchEntity):
     @property
     def is_on(self):
         """Return true if switch is on."""
+        self._state = self._hub.curtailment
         return self._state
 
     @property
     def unique_id(self) -> str:
         """Return a unique ID."""
         return self._id
+
     @property
     def available(self) -> bool:
         """Return True if auto mode not enabled."""
-        return True 
+        return True
 
     async def async_turn_on(self, **kwargs):
         """Turn the switch on."""
@@ -84,16 +94,28 @@ class SolarCurtailmentSwitch(SwitchEntity):
 
     async def async_update(self):
         """Update the state of the switch."""
-        self._state = await self._hub.get_solar_curtailment()
-        
+        self._state = self._hub.curtailment
+
+    async def async_added_to_hass(self):
+        """Handle when the entity is added to Home Assistant."""
+
+        @callback
+        def async_auto_switch_state_listener(event):
+            """React to changes in the auto_switch state."""
+            self.async_schedule_update_ha_state()
+
+        self._hub.add_listener(async_auto_switch_state_listener)
+
+
 class AutoSwitch(SwitchEntity):
     """Representation of a switch to control whether Auto mode is on and Manage Energy controls battery charge/discharge."""
+
     type = "Auto Power Management"
 
     def __init__(self, name, title, hub):
         self._id = name
         self._hub = hub
-        self._state =  self._hub.get_auto()
+        self._state = self._hub.get_auto()
         self._name = title
         self._icon = "mdi:power-plug"
         self._available = True
@@ -102,9 +124,10 @@ class AutoSwitch(SwitchEntity):
             "identifiers": {(DOMAIN, self._hub.hub_id)},
             "name": self._name,
             "manufacturer": self._hub.manufacturer,
-            "model": "Energy Manager"}
+            "model": "Energy Manager",
+        }
         self.enabled_by_default = True
-        
+
     @property
     def unique_id(self) -> str:
         """Return a unique ID."""
@@ -135,12 +158,11 @@ class AutoSwitch(SwitchEntity):
     def unique_id(self) -> str:
         """Return a unique ID."""
         return self._id
-        
+
     @property
     def available(self) -> bool:
         """Return True if entity is available."""
         return self._available
-
 
     async def async_turn_on(self, **kwargs):
         """Turn the switch on."""
@@ -157,4 +179,3 @@ class AutoSwitch(SwitchEntity):
     async def async_update(self):
         """Update the state of the switch."""
         self._state = self._hub.get_auto()
-

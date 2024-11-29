@@ -1,4 +1,5 @@
 """Platform for sensor integration."""
+
 # This file shows the setup for the sensors associated with the cover.
 # They are setup in the same way with the call to the async_setup_entry function
 # via HA from the module __init__. Each sensor has a device_class, this tells HA how
@@ -7,15 +8,17 @@
 # battery), the unit_of_measurement should match what's expected.
 import random
 from homeassistant.components.sensor import (
-    Entity, SensorEntity,    SensorDeviceClass,
-    SensorEntityDescription,)
+    Entity,
+    SensorEntity,
+    SensorDeviceClass,
+    SensorEntityDescription,
+)
 from homeassistant.helpers.restore_state import RestoreEntity
 from homeassistant.helpers.entity import EntityCategory
 
 from .const import DOMAIN
 
 from homeassistant.const import (
-
     ATTR_IDENTIFIERS,
     ATTR_MANUFACTURER,
     ATTR_MODEL,
@@ -24,7 +27,6 @@ from homeassistant.const import (
 
 
 SENSORS: dict[str, SensorEntityDescription] = {
-
     "status": SensorEntityDescription(
         key="manage-energy-status",
         translation_key="status",
@@ -37,22 +39,29 @@ SENSORS: dict[str, SensorEntityDescription] = {
         translation_key="history",
         name="Manage Energy History",
         icon="mdi:gauge-low",
-        entity_category=EntityCategory.DIAGNOSTIC,)}
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+}
 
 
 async def async_setup_entry(hass, config_entry, async_add_entities):
     """Add sensors for passed config_entry in HA."""
     hub = hass.data[DOMAIN][config_entry.entry_id]
 
-    async_add_entities([StatusBase(SENSORS['status'], config_entry, hub),
-                        HistoryBase(SENSORS["history"], config_entry, hub)
-                        ])
+    async_add_entities(
+        [
+            StatusBase(SENSORS["status"], config_entry, hub),
+            HistoryBase(SENSORS["history"], config_entry, hub),
+        ]
+    )
 
 
 class SensorBase(SensorEntity, RestoreEntity):
     """SensorBase for Manage Energy."""
 
-    def __init__(self, entity_description: SensorEntityDescription, config_entry, hub) -> None:
+    def __init__(
+        self, entity_description: SensorEntityDescription, config_entry, hub
+    ) -> None:
         """Initialize the sensor."""
         super().__init__()
         self._hub = hub
@@ -66,7 +75,6 @@ class SensorBase(SensorEntity, RestoreEntity):
             ATTR_NAME: self._hub.name,
             ATTR_MANUFACTURER: hub.manufacturer,
             ATTR_MODEL: "Energy Model",
-
         }
         self._unique_id = entity_description.key
 
@@ -102,7 +110,6 @@ class SensorBase(SensorEntity, RestoreEntity):
 
 
 class StatusBase(SensorBase):
-
     should_poll = False
 
     def __init__(self, entity_description, config_entry, hub) -> None:
@@ -123,11 +130,13 @@ class StatusBase(SensorBase):
 
 
 class HistoryBase(SensorBase, RestoreEntity):
-
-    def __init__(self, entity_description: SensorEntityDescription, config_entry, hub) -> None:
+    def __init__(
+        self, entity_description: SensorEntityDescription, config_entry, hub
+    ) -> None:
         """Initialize the sensor."""
 
         hub.forecasts.add_listener(self._on_hub_state_changed)
+        self._state = None
 
         super().__init__(entity_description, config_entry, hub)
 
