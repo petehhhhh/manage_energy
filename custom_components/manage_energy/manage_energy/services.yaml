@@ -1,3 +1,0 @@
-handle_manage_energy:
-  description: "Call the handle_manage_energy method of manage_energy class"
-  fields: {}
