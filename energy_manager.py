@@ -228,17 +228,6 @@ class manage_energy:
 
         return False
 
-    async def is_demand_window(self) -> bool:
-        current_time = datetime.datetime.now().time()
-        current_month = datetime.datetime.now().month
-
-        # Define peak period months: June to August and November to March
-        peak_months = list(range(6, 9)) + [11, 12, 1, 2, 3]
-
-        start_time = datetime.time(15, 0, 0)
-        end_time = datetime.time(21, 0, 0)
-        return current_month in peak_months and (start_time <= current_time <= end_time)
-
     def should_i_charge_as_not_enough_solar(self) -> bool:
         """Works out whether now is a good time to charge battery if going to be importing in the next forecast window."""
         actuals = self.actuals
@@ -256,21 +245,22 @@ class manage_energy:
             * 2
         )
         # if in the next six hours i am going to be exporting energy...
+        firstgridimport = next(
+            (i for i, num in enumerate(self.forecasts.export) if num < 0), None
+        )
+        if firstgridimport is None:
+            return False
 
-        if min(self.forecasts.export[0:FORECAST_WINDOW]) < 0:
-            if (
-                (
-                    actuals.feedin
-                    <= max(
-                        sorted(self.forecasts.amber[0:FORECAST_WINDOW])[
-                            :blocks_to_charge
-                        ]
-                    )
-                )
-                and actuals.battery_pct_level < MAX_BATTERY_LEVEL
-                and not self.is_demand_window()
-            ):
-                return True
+        if (
+            actuals.feedin
+            <= max(
+                sorted(self.forecasts.amber_scaled_price[0:firstgridimport])[
+                    :blocks_to_charge
+                ]
+            )
+            and actuals.battery_pct_level < MAX_BATTERY_LEVEL
+        ):
+            return True
 
         return False
 
@@ -288,7 +278,7 @@ class manage_energy:
             forecasts = self.forecasts
             await forecasts.build()
             TTL_FORECAST_BLOCKS = 24
-            next12hours = forecasts.amber[0:TTL_FORECAST_BLOCKS]
+            next12hours = forecasts.amber_feed_in[0:TTL_FORECAST_BLOCKS]
 
             discharge_blocks_available = (
                 int(
@@ -390,7 +380,6 @@ class manage_energy:
             tesla_charging = await tesla.tesla_charging(forecasts)
             # Now we can now make a decision if we start to feed in...
 
-            isDemandWindow = await self.is_demand_window()
             # scaled minimum margin to avoid eg charging at $15 when it is forecast to be $15.50... High risk of disappointment...
             if actuals.feedin > 0.5:
                 scaled_min_margin = self.minimum_margin / 0.20 * actuals.feedin
@@ -403,7 +392,7 @@ class manage_energy:
                     (
                         # if it is currently 90% of the maximum forecsated and there is acceptable margin then take it !
                         actuals.feedin
-                        >= (0.9 * float(max(next12hours[0:10]) + self.minimum_margin))
+                        >= (0.9 * float(max(next12hours[0:10]) + scaled_min_margin))
                     )
                     or (
                         # otherwise if it is moire than the max values (that already are calced with minimum margin)
@@ -415,22 +404,6 @@ class manage_energy:
                     await self.update_status("Discharging into Price Spike")
                     await self.discharge_battery()
 
-                # charge battery if prices rising in the next 6 hours and we will be importing energy at the end of the max period
-                elif (
-                    actuals.feedin * 1.3 < max(next12hours[0:TTL_FORECAST_BLOCKS])
-                    and actuals.feedin <= min(next12hours[0:TTL_FORECAST_BLOCKS])
-                    and start_high_prices != None
-                    and end_high_prices != None
-                    and forecasts.export[end_high_prices] < 0
-                    and actuals.battery_pct_level < 99
-                    and not isDemandWindow
-                ):
-                    await self.charge_battery()
-                    await self.update_status(
-                        "Charging battery as not enough solar & battery and prices rising at "
-                        + start_str
-                    )
-
                 elif self.should_i_charge_as_not_enough_solar():
                     await self.charge_battery()
                     await self.update_status(
@@ -439,7 +412,7 @@ class manage_energy:
 
                 elif (
                     len(max_values) > 0
-                    and actuals.price + scaled_min_margin < (max_values[0] * 0.9)
+                    and actuals.scaled_price + scaled_min_margin < (max_values[0] * 0.9)
                     and battery_at_peak < actuals.battery_max_energy
                     and actuals.battery_pct_level < MAX_BATTERY_LEVEL
                 ):

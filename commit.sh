@@ -37,6 +37,8 @@ fi
 
 # Step 2: Commit, tag, and push changes
 echo "Staging changes..."
+pushd .
+cd $REPO_PATH
 git add .
 echo "Committing changes with message: Release v$NEW_VERSION: $COMMIT_MESSAGE"
 git commit -m "Release v$NEW_VERSION: $COMMIT_MESSAGE"
@@ -53,3 +55,4 @@ echo "Creating GitHub release..."
 gh release create "v$NEW_VERSION" --title "v$NEW_VERSION" --notes "$COMMIT_MESSAGE"
 
 echo "Release v$NEW_VERSION successfully committed, tagged, and published to GitHub!"
+popd

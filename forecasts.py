@@ -4,19 +4,34 @@ from .const import (
     DOMAIN,
     PowerSelectOptions,
     TeslaModeSelectOptions,
+    DEMAND_SCALE_UP,
 )
 import time
 import logging
 import traceback
-import datetime
-import asyncio
-from pytz import timezone
+
+from zoneinfo import ZoneInfo
+
 from homeassistant.core import HomeAssistant, StateMachine
 from homeassistant.components.recorder import get_instance
 from homeassistant.components.recorder.history import state_changes_during_period
 from homeassistant.helpers.event import async_track_time_interval, async_call_later
+from datetime import datetime, time, date, timedelta
 
 _LOGGER = logging.getLogger(__name__)
+
+
+def scale_price_for_demand_window(vtime, val) -> bool:
+    # Define peak period months: June to August and November to March
+    peak_months = list(range(6, 9)) + [11, 12, 1, 2, 3]
+
+    start_time = time(15, 0, 0)
+    end_time = time(21, 0, 0)
+
+    if vtime.month in peak_months and (start_time <= vtime.time() <= end_time):
+        return val + DEMAND_SCALE_UP
+    else:
+        return val
 
 
 class Actuals:
@@ -26,6 +41,7 @@ class Actuals:
 
     def refresh(self):
         self.price = self.get_entity_state("sensor.amber_general_price")
+        self.scaled_price = scale_price_for_demand_window(datetime.now(), self.price)
         self.feedin = self.get_entity_state("sensor.amber_feed_in_price")
         self.battery_pct_level = self.get_entity_state("sensor.home_battery")
         self.battery_max_energy = self.get_entity_state(
@@ -69,7 +85,8 @@ class Forecasts:
         self._actuals = hub.actuals
         self._listeners = []
         self.history = []
-        self.amber = []
+        self.amber_feed_in = []
+        self.amber_scaled_price = []
         self.start_time = []
         self.solar = []
         self.consumption = []
@@ -88,13 +105,28 @@ class Forecasts:
         for callback in self._listeners:
             callback(self.history)
 
-    def forecast_amber(self):
-        self.forecast_data = self._hass.states.get("sensor.amber_feed_in_forecast")
+    def forecast_and_scale_amber_prices(self):
+        self.forecast_data = self._hass.states.get("sensor.amber_general_forecast")
         forecast = [f["per_kwh"] for f in self.forecast_data.attributes["forecasts"]]
+        # Iterate over self.times and adjust the forecast
+        for i, tme in enumerate(self.start_time):
+            forecast[i] = scale_price_for_demand_window(tme, forecast[i])
+
+        return forecast
+
+    def forecast_amber_feed_in_and_times(self):
+        # Retrieve forecast data from the sensor
+        self.forecast_data = self._hass.states.get("sensor.amber_feed_in_forecast")
+
+        # Extract forecast prices
+        forecast = [f["per_kwh"] for f in self.forecast_data.attributes["forecasts"]]
+
+        # Extract times and convert to datetime objects
         times = [
             self.format_date(f["start_time"])
             for f in self.forecast_data.attributes["forecasts"]
         ]
+
         return forecast, times
 
     def forecast_solar(self):
@@ -110,7 +142,7 @@ class Forecasts:
             for index, value in enumerate(sf_data):
                 if self.compare_datetimes(value["period_start"], self.start_time[0]):
                     solar_forecast = [sf["pv_estimate"] for sf in sf_data[index:]]
-                    tomorrow_rows = len(self.amber) - len(solar_forecast)
+                    tomorrow_rows = len(self.amber_feed_in) - len(solar_forecast)
                     if tomorrow_rows > 0:
                         solar_forecast = solar_forecast + [
                             sf["pv_estimate"]
@@ -218,7 +250,7 @@ class Forecasts:
         history.append(
             {
                 "start_time": self.start_time[6],
-                "amber": self.amber[6],
+                "amber": self.amber_feed_in[6],
                 "solar": self.solar[6],
                 "consumption": self.consumption[6],
                 "net": self.net[6],
@@ -249,10 +281,11 @@ class Forecasts:
     #     "sensor.manage_energy_history", len(history), {"history": history})
 
     async def build(self):
-        self.amber, self.start_time = self.forecast_amber()
+        self.amber_feed_in, self.start_time = self.forecast_amber_feed_in_and_times()
+        self.amber_scaled_price = self.forecast_and_scale_amber_prices()
         self.consumption, yesterday_solar = await self.get_yesterday_consumption()
         solar_forecast = self.forecast_solar()
-        if len(solar_forecast) < len(self.amber):
+        if len(solar_forecast) < len(self.amber_feed_in):
             self.solar = yesterday_solar
         else:
             self.solar = solar_forecast
@@ -262,12 +295,23 @@ class Forecasts:
         await self.store_history()
 
     def format_date(self, std1):
+        """Converts a date string or datetime to the specified time zone using zoneinfo."""
+        # Use ZoneInfo for the Australia/Sydney timezone
+        tz = ZoneInfo("Australia/Sydney")
+
+        # Format string for parsing the input
         format_string = "%Y-%m-%dT%H:%M:%S%z"
-        tz = timezone("Australia/Sydney")
-        if not isinstance(std1, datetime.datetime):
-            std1 = datetime.datetime.strptime(std1, format_string)
+
+        # Parse std1 if it's not already a datetime object
+        if not isinstance(std1, datetime):
+            std1 = datetime.strptime(std1, format_string)
+
+        # Convert to the specified timezone
         std1 = std1.astimezone(tz)
+
+        # Remove seconds for consistency
         std1 = std1.replace(second=0)
+
         return std1
 
     def compare_datetimes(self, std1, std2):
@@ -294,14 +338,14 @@ class Forecasts:
         duration_minutes = 30  # Adjust the duration as needed
 
         # Calculate the previous day
-        previous_day = start_time - datetime.timedelta(days=1)
+        previous_day = start_time - timedelta(days=1)
 
         # Calculate the corresponding end time
-        end_time = previous_day + datetime.timedelta(minutes=duration_minutes)
+        end_time = previous_day + timedelta(minutes=duration_minutes)
 
-        # Convert times to UTC
-        start_time = previous_day.astimezone(datetime.timezone.utc)
-        end_time = end_time.astimezone(datetime.timezone.utc)
+        # Convert times to UTC using zoneinfo
+        start_time = previous_day.astimezone(ZoneInfo("UTC"))
+        end_time = end_time.astimezone(ZoneInfo("UTC"))
 
         # Retrieve state changes for the sensor during the specified time period
 

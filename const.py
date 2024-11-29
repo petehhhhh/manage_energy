@@ -9,6 +9,8 @@ MIN_MARGIN = 0.2
 BATTERY_DISCHARGE_RATE = 8
 CURTAIL_BATTERY_LEVEL = 95
 MAX_BATTERY_LEVEL = 99
+# how much to add to general forecast price for when in demand window.... 30 days at 30 cents for 5 extra kW...
+DEMAND_SCALE_UP = 30 * 5 * 0.3
 
 
 class PowerSelectOptions(StrEnum):
