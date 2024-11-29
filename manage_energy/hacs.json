@@ -1,0 +1,12 @@
+{
+  "name": "Manage Energy",
+  "content_in_root": false,
+  "domains": [
+    "manage_energy"
+  ],
+  "country": "Global",
+  "homeassistant": "2021.12.0",
+  "render_readme": true,
+  "iot_class": "local_polling",
+  "version": "1.0.1"
+}
