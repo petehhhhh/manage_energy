@@ -244,6 +244,10 @@ class manage_energy:
             )
             * 2
         )
+        
+        if firstgridimport < 7:
+            firstgridimport = 6
+            
         # if in the next six hours i am going to be exporting energy...
         firstgridimport = next(
             (i for i, num in enumerate(self.forecasts.export) if num < 0), None
