@@ -12,13 +12,8 @@ if [ -z "$COMMIT_MESSAGE" ]; then
   exit 1
 fi
 
-# Step 1: Pull remote changes
-cd $REPO_PATH
-echo "Pulling the latest changes from the remote repository..."
-git fetch origin main
-git pull --rebase origin main
 
-# Step 2: Auto-increment version
+# Step 1: Auto-increment version
 if [ -f "$HACS_FILE" ]; then
   CURRENT_VERSION=$(jq -r ".version" "$HACS_FILE")
   if [ -z "$CURRENT_VERSION" ] || [ "$CURRENT_VERSION" = "null" ]; then
@@ -40,7 +35,7 @@ else
   exit 1
 fi
 
-# Step 3: Commit, tag, and push changes
+# Step 2: Commit, tag, and push changes
 echo "Staging changes..."
 git add .
 echo "Committing changes with message: Release v$NEW_VERSION: $COMMIT_MESSAGE"
