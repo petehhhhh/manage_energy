@@ -10,7 +10,13 @@ from .const import (
 import logging
 import datetime
 import traceback
-from pytz import timezone
+from .decide import (
+    Should_i_charge_as_not_enough_solar,
+    ShouldIDischarge,
+    ShouldIChargeforPriceSpike,
+    PreserveWhileTeslaCharging,
+    MaximiseUsage,
+)
 from homeassistant.core import HomeAssistant, StateMachine  # type: ignore
 from homeassistant.components.recorder import get_instance  # type: ignore
 from homeassistant.components.recorder.history import state_changes_during_period  # type: ignore
@@ -83,7 +89,8 @@ class manage_energy:
         self._state = ""
         self._notify_listeners()
 
-    async def update_status(self, msg):
+    def update_status(self, msg):
+        """Write a status msg to status field and log it."""
         msg = msg.strip()
         if msg[-1] != ".":  # add a full stop if not there
             msg = msg + "."
@@ -167,12 +174,11 @@ class manage_energy:
         #    async_call_later(self._hass, 2, self.refresh_proxy)
         await self.refresh()
 
-    async def set_mode(self, mode):
+    def set_mode(self, mode):
         old_mode = self._mode
         self._mode = mode
         if old_mode != mode:
             self._notify_listeners()
-            await self.refresh()
 
     def get_mode(self) -> str:
         return self._mode
@@ -202,20 +208,6 @@ class manage_energy:
     async def auto_mode(self) -> bool:
         if self._auto:
             return True
-        elif self._mode == PowerSelectOptions.DISCHARGE:
-            await self.discharge_battery()
-            await self.update_status("Override: Discharging Battery")
-        elif self._mode == PowerSelectOptions.CHARGE:
-            await self.charge_battery()
-            await self.update_status("Override: Charging Battery")
-        elif self._mode == PowerSelectOptions.MAXIMISE:
-            await self.maximise_self()
-            await self.update_status("Override: Maximising Self")
-        elif self._mode == PowerSelectOptions.OFF:
-            await self.battery_off()
-            await self.update_status("Override: Solar only - Battery Off")
-
-        return False
 
     async def tesla_mode(self) -> bool:
         if self._mode == TeslaModeSelectOptions.AUTO:
@@ -236,7 +228,7 @@ class manage_energy:
                 return
             self._running = True
             await self.clear_status()
-            await self.update_status("Runnning manage energy...")
+            self.update_status("Runnning manage energy...")
 
             self.actuals.refresh()
             actuals = self.actuals
@@ -250,72 +242,47 @@ class manage_energy:
             await self.clear_status()
             tesla = TeslaCharging(self)
 
-            tesla_charging = await tesla.tesla_charging(forecasts)
+            self.tesla_charging = await tesla.tesla_charging(forecasts)
             # Now we can now make a decision if we start to feed in...
 
+            # lambda functions allow to load into an array of rules. Rules are defined in decide.py
             if self._auto:
-                # if i have available energy and the actual is as good as it gets in the next five hours (with margin) or there is a price spike in the next 5 hours and this is one of the best opportunities...
-                if (actuals.available_battery_energy > actuals.battery_min_energy) and (
-                    (
-                        # if it is currently 90% of the maximum forecsated and there is acceptable margin then take it !
-                        actuals.feedin
-                        >= (0.9 * float(max(a.next12hours[0:10]) + a.scaled_min_margin))
-                    )
-                    or (
-                        # otherwise if it is moire than the max values (that already are calced with minimum margin)
-                        a.available_max_values is not None
-                        and len(a.available_max_values) > 0
-                        and actuals.feedin >= 0.9 * min(a.available_max_values)
-                    )
-                ):
-                    await self.update_status("Discharging into Price Spike")
-                    await self.discharge_battery()
-
-                elif a.should_i_charge_as_not_enough_solar():
-                    await self.charge_battery()
-                    await self.update_status(
-                        "Charging battery as cheaper time to charge."
-                    )
-
-                elif (
-                    len(a.max_values) > 0
-                    and actuals.scaled_price + a.scaled_min_margin
-                    < (a.max_values[0] * 0.9)
-                    and a.battery_at_peak < actuals.battery_max_energy
-                    and actuals.battery_pct_level < MAX_BATTERY_LEVEL
-                ):
-                    await self.update_status(
-                        "Making sure battery charged for upcoming price spike at "
-                        + a.peak_start_str
-                    )
-                    await self.charge_battery()
-
-                elif tesla_charging:
-                    await self.preserve_battery()
-                    await self.update_status("Charging from Solar while charging Tesla")
-
-                else:
-                    if not a.insufficient_margin:
-                        await self.update_status(
-                            "Maximising current usage. Next peak at " + a.start_str
-                        )
-                    else:
-                        await self.update_status("Maximising current usage.")
-                    await self.maximise_self()
+                rules = [
+                    lambda: ShouldIDischarge(a).run(
+                        PowerSelectOptions.DISCHARGE, "Discharging into Price Spike"
+                    ),
+                    lambda: Should_i_charge_as_not_enough_solar(a).run(
+                        PowerSelectOptions.CHARGE, "Charging as cheaper now."
+                    ),
+                    lambda: ShouldIChargeforPriceSpike(a).run(
+                        PowerSelectOptions.CHARGE,
+                        "Charging for price spike at " + a.peak_start_str,
+                    ),
+                    lambda: PreserveWhileTeslaCharging(a).run(
+                        PowerSelectOptions.OFF, "Preserving charge"
+                    ),
+                    lambda: MaximiseUsage(a).run(
+                        PowerSelectOptions.MAXIMISE, "Maximising usage"
+                    ),
+                ]
+                # and will run one by one, stopping when the first is succesful. The last maximise usage is always successful.
+                for rule in rules:
+                    if rule():
+                        break
 
             if (
-                not tesla_charging
+                not self.tesla_charging
                 and actuals.battery_pct_level >= CURTAIL_BATTERY_LEVEL
                 and actuals.feedin < 0
             ):
                 await self.curtail_solar()
-                await self.update_status("Curtailing solar")
+                self.update_status("Curtailing solar")
             else:
                 await self.uncurtail_solar()
 
         except Exception as e:
             error_details = traceback.format_exc()
-            await self.update_status("Error: " + str(e))
+            self.update_status("Error: " + str(e))
             raise RuntimeError("Error in handle_manage_energy: " + str(e))
         finally:
             self._running = False

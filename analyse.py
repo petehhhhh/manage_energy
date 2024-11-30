@@ -16,7 +16,7 @@ class Analysis:
         """Initiatise Analysis."""
         self.forecasts = forecasts
         self.actuals = actuals
-        self._hub = hub
+        self.hub = hub
 
         self.discharge_blocks_available = 0
         self.max_values = None
@@ -136,86 +136,3 @@ class Analysis:
                 self.peak_start_time = forecasts.start_time[self.start_high_prices]
                 self.peak_start_time = forecasts.format_date(self.peak_start_time)
                 self.peak_start_str = self.peak_start_time.strftime("%I:%M%p")
-
-    def should_i_charge_as_not_enough_solar(self) -> bool:
-        """Works out whether now is a good time to charge battery if going to be importing in the next forecast window."""
-        actuals = self.actuals
-        FORECAST_WINDOW = 24
-        # half an hour blocks it will take to charge...
-        blocks_to_charge = (
-            int(
-                round(
-                    (1 - (actuals.battery_pct_level / 100))
-                    * actuals.battery_max_usable_energy
-                    / BATTERY_DISCHARGE_RATE,
-                    0,
-                )
-            )
-            * 2
-        )
-        # If my battery level is not going to hit 100... or i am going to be importing power before it does
-        # and power cheap now. Top up..
-        battery_charged = next(
-            (
-                i
-                for i, num in enumerate(self.forecasts.battery_energy)
-                if num >= self.actuals.battery_max_energy
-            ),
-            None,
-        )
-        firstgridimport = next(
-            (i for i, num in enumerate(self.forecasts.export) if num < 0), None
-        )
-
-        # if battery will be charged before we next import power, don't charge
-        if firstgridimport is None or (
-            (battery_charged is not None and firstgridimport > battery_charged)
-            or actuals.battery_pct_level >= MAX_BATTERY_LEVEL
-            or is_demand_window(datetime.datetime.now())
-        ):
-            return False
-
-        if battery_charged is None or firstgridimport < battery_charged:
-            first_no_grid_export = None
-            for i, num in enumerate(self.forecasts.export):
-                if num >= 0 and i > firstgridimport:
-                    first_no_grid_export = i
-                    break
-
-        # else check for the blocks up to when it will be charged or for the entire window.
-
-        if battery_charged is None or first_no_grid_export is None:
-            blocks_to_check = FORECAST_WINDOW
-        else:
-            blocks_to_check = first_no_grid_export
-
-        # find when next higher price is coming...
-        first_higher_price = None
-        for i, num in enumerate(self.forecasts.amber_scaled_price):
-            if num * 0.9 > actuals.scaled_price:
-                first_higher_price = i
-                break
-        # if i have a higher price upcoming that i will need to import for, check whether this is a good time...
-        if (
-            first_higher_price is not None
-            and first_higher_price < blocks_to_check
-            and first_higher_price < first_no_grid_export
-        ):
-            blocks_to_check = first_higher_price
-
-        blocks_to_charge = min(blocks_to_check + 1, blocks_to_charge)
-
-        if blocks_to_check == 0:
-            if actuals.scaled_price < 0.9 * self.forecasts.amber_scaled_price[0]:
-                return True
-        else:
-            if actuals.scaled_price <= max(
-                sorted(self.forecasts.amber_scaled_price[0 : blocks_to_check - 1])[
-                    : blocks_to_charge - 1
-                ]
-            ):
-                return True
-
-        # also check whether prices will be higher when we don't have enough power
-
-        return False

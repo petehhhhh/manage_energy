@@ -51,7 +51,7 @@ class Actuals:
         self.price = self.get_entity_state("sensor.amber_general_price")
         self.scaled_price = scale_price_for_demand_window(datetime.now(), self.price)
         self.feedin = self.get_entity_state("sensor.amber_feed_in_price")
-        self.battery_pct_level = self.get_entity_state("sensor.home_battery")
+        self.battery_pct_level = self.get_entity_state("sensor.home_charge")
         self.battery_max_energy = self.get_entity_state(
             "sensor.battery1_battery_capacity"
         ) + self.get_entity_state("sensor.battery2_battery_capacity")

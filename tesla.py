@@ -118,18 +118,18 @@ class TeslaCharging:
                     {"entity_id": "switch.pete_s_tesla_charger"},
                     True,
                 )
-                await self._hub.update_status(
+                self._hub.update_status(
                     "Charging Tesla at " + str(charge_amps) + " amps"
                 )
                 return True
             else:
                 if charge_limit <= current_charge:
-                    await self._hub.update_status("Tesla: charge limit reached.")
+                    self._hub.update_status("Tesla: charge limit reached.")
                 elif (
                     self.actuals.price > self._cheap_price
                     and self._tesla_mode == TeslaModeSelectOptions.CHEAP_GRID
                 ):
-                    await self._hub.update_status(
+                    self._hub.update_status(
                         "Tesla: Grid price over maximum of "
                         + str(self._cheap_price)
                         + " cents."
@@ -140,13 +140,11 @@ class TeslaCharging:
                         and self._tesla_mode == TeslaModeSelectOptions.CHEAP_GRID
                         and self.actuals.price <= cheap_price
                     ):
-                        await self._hub.update_status("Tesla: In demand window.")
+                        self._hub.update_status("Tesla: In demand window.")
                     elif self.actuals.feedin <= cheap_price:
-                        await self._hub.update_status("Tesla: No excess solar.")
+                        self._hub.update_status("Tesla: No excess solar.")
                     else:
-                        await self._hub.update_status(
-                            "Tesla: Feed in over cheap price."
-                        )
+                        self._hub.update_status("Tesla: Feed in over cheap price.")
 
                 await self._hass.services.async_call(
                     "switch",
@@ -169,7 +167,7 @@ class TeslaCharging:
 
         except Exception as e:
             msg = str(e)
-            await self._hub.update_status("Error in Tesla_Charging. Error : " + msg)
+            self._hub.update_status("Error in Tesla_Charging. Error : " + msg)
             error_message = traceback.format_exc()
             # Log the error with the traceback
             _LOGGER.error(
