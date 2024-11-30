@@ -259,8 +259,10 @@ class manage_energy:
         else:
             blocks_to_check = firstgridimport
         if (
-            actuals.feedin
-            <= max(
+            actuals.scaled_price
+            # add a 10% buffer. So if it is less than 10% cheaper worth charging...
+            <= 0.9
+            * max(
                 sorted(self.forecasts.amber_scaled_price[0:blocks_to_check])[
                     :blocks_to_charge
                 ]
@@ -414,8 +416,7 @@ class manage_energy:
                 elif self.should_i_charge_as_not_enough_solar():
                     await self.charge_battery()
                     await self.update_status(
-                        "Charging battery as cheap time to charge before price rise at "
-                        + start_str
+                        "Charging battery as cheaper time to charge."
                     )
 
                 elif (
@@ -427,7 +428,6 @@ class manage_energy:
                     await self.update_status(
                         "Making sure battery charged for upcoming price spike at "
                         + start_str
-                        + " as insufficent solar to charge to peak"
                     )
                     await self.charge_battery()
 
