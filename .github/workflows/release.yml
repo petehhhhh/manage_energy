@@ -13,7 +13,7 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v3
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}  # Use the GitHub token for checkout
+          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Set Up Node.js (Optional for HACS formatting validation)
         uses: actions/setup-node@v3
@@ -34,22 +34,25 @@ jobs:
         run: |
           jq ".version = \"$NEW_VERSION\"" hacs.json > tmp_hacs.json && mv tmp_hacs.json hacs.json
           jq ".version = \"$NEW_VERSION\"" manifest.json > tmp_manifest.json && mv tmp_manifest.json manifest.json
+        env:
+          NEW_VERSION: ${{ env.new_version }}
 
       - name: Commit Version Updates
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NEW_VERSION: ${{ env.new_version }}
         run: |
           git config --local user.name "GitHub Actions"
           git config --local user.email "actions@github.com"
           git add hacs.json manifest.json
-          git commit -m "Auto-bump version to v$NEW_VERSION"
+          git commit -m "Auto-bump version to v${{ env.new_version }}"
           git push origin main
 
       - name: Create Release
         uses: ncipollo/release-action@v1
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}  # Use the GitHub token for release creation
-          tag: "v$NEW_VERSION"
-          name: "v$NEW_VERSION"
+          token: ${{ secrets.GITHUB_TOKEN }}
+          tag: "v${{ env.new_version }}"
+          name: "v${{ env.new_version }}"
           commit: "main"
-          body: "Auto-generated release for version v$NEW_VERSION"
+          body: "Auto-generated release for version v${{ env.new_version }}"
