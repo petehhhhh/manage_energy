@@ -114,15 +114,27 @@ class Should_i_charge_as_not_enough_solar(baseDecide):
 
         blocks_to_charge = min(blocks_to_check + 1, blocks_to_charge)
 
+        if blocks_to_charge == 0:
+            return False
+
         if blocks_to_check == 0:
             if actuals.scaled_price < 0.9 * self.forecasts.amber_scaled_price[0]:
                 return True
         else:
-            if actuals.scaled_price <= max(
-                sorted(self.forecasts.amber_scaled_price[0 : blocks_to_check - 1])[
-                    : blocks_to_charge - 1
-                ]
-            ):
+            blocks = self.forecasts.amber_scaled_price[0 : blocks_to_check - 1]
+            if len(blocks) == 0:
+                return False
+
+            if len(blocks) == 1:
+                val = blocks[0]
+            else:
+                blocks = sorted(blocks)[: blocks_to_charge - 1]
+                if len(blocks) == 1:
+                    val = blocks[0]
+                else:
+                    val = max(blocks)
+
+            if actuals.scaled_price <= val:
                 return True
 
         # also check whether prices will be higher when we don't have enough power
@@ -140,7 +152,10 @@ class ShouldIDischarge(baseDecide):
             (
                 # if it is currently 90% of the maximum forecsated and there is acceptable margin then take it !
                 self.actuals.feedin
-                >= (0.9 * float(max(a.next12hours[0:10]) + a.scaled_min_margin))
+                >= (
+                    0.9
+                    * float(max(self.a.next12hours[0:10]) + self.a.scaled_min_margin)
+                )
             )
             or (
                 # otherwise if it is moire than the max values (that already are calced with minimum margin)

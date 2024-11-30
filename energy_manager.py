@@ -85,7 +85,7 @@ class manage_energy:
         for callback in self._listeners:
             callback(self)
 
-    async def clear_status(self):
+    def clear_status(self):
         self._state = ""
         self._notify_listeners()
 
@@ -227,7 +227,7 @@ class manage_energy:
             if self._running:
                 return
             self._running = True
-            await self.clear_status()
+            self.clear_status()
             self.update_status("Runnning manage energy...")
 
             self.actuals.refresh()
@@ -239,7 +239,7 @@ class manage_energy:
             a = Analysis(forecasts, actuals, self)
             a.analyze_price_peaks()
 
-            await self.clear_status()
+            self.clear_status()
             tesla = TeslaCharging(self)
 
             self.tesla_charging = await tesla.tesla_charging(forecasts)

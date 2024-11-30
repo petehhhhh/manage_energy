@@ -41,8 +41,8 @@ class Analysis:
         TTL_FORECAST_BLOCKS = 24
         forecasts = self.forecasts
         actuals = self.actuals
-        next12hours = forecasts.amber_feed_in[0:TTL_FORECAST_BLOCKS]
-
+        self.next12hours = forecasts.amber_feed_in[0:TTL_FORECAST_BLOCKS]
+        next12hours = self.next12hours
         self.discharge_blocks_available = (
             int(round(actuals.battery_max_usable_energy / BATTERY_DISCHARGE_RATE, 0))
             * 2
@@ -73,9 +73,9 @@ class Analysis:
                 self.end_high_prices = None
                 for index, value in enumerate(next12hours):
                     # if this entry is after the start of high prices and it is less than this value less required margin...
-                    if (index > self.start_high_prices) and (
-                        (value + self.minimum_margin) <= value1
-                    ):
+                    if (
+                        self.start_high_prices is None or index > self.start_high_prices
+                    ) and ((value + self._minimum_margin) <= value1):
                         self.end_high_prices = index
                         self.insufficient_margin = False
                         break
@@ -92,6 +92,9 @@ class Analysis:
 
                 last_end_high_prices = self.end_high_prices  # noqa: F841
 
+            if self.start_high_prices is None:
+                return
+
             # if we didn't find one then check that the current price is the tail of the peak
             self.available_max_values = None
             if self.end_high_prices is None:
@@ -104,6 +107,7 @@ class Analysis:
                 if actuals.feedin < (min(next12hours) + self._minimum_margin):
                     self.insufficient_margin = True
                 # to give us how many blocks of high prices we have
+
                 blocks_till_price_drops = self.end_high_prices - self.start_high_prices
 
                 # recalculate actual half hour blocks of discharge available less enough battery to cover consumption
@@ -125,7 +129,7 @@ class Analysis:
                 if len(
                     self.available_max_values
                 ) < self.discharge_blocks_available and actuals.feedin >= (
-                    min(next12hours) + self.minimum_margin
+                    min(next12hours) + self._minimum_margin
                 ):
                     self.available_max_values.append(actuals.feedin)
 

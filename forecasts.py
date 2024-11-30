@@ -95,6 +95,7 @@ class Forecasts:
         self.history = []
         self.amber_feed_in = []
         self.amber_scaled_price = []
+        self.amber_price = []
         self.start_time = []
         self.solar = []
         self.consumption = []
@@ -117,10 +118,11 @@ class Forecasts:
         self.forecast_data = self._hass.states.get("sensor.amber_general_forecast")
         forecast = [f["per_kwh"] for f in self.forecast_data.attributes["forecasts"]]
         # Iterate over self.times and adjust the forecast
+        scale_forecast = forecast.copy()
         for i, tme in enumerate(self.start_time):
-            forecast[i] = scale_price_for_demand_window(tme, forecast[i])
+            scale_forecast[i] = scale_price_for_demand_window(tme, forecast[i])
 
-        return forecast
+        return forecast, scale_forecast
 
     def forecast_amber_feed_in_and_times(self):
         # Retrieve forecast data from the sensor
@@ -290,7 +292,9 @@ class Forecasts:
 
     async def build(self):
         self.amber_feed_in, self.start_time = self.forecast_amber_feed_in_and_times()
-        self.amber_scaled_price = self.forecast_and_scale_amber_prices()
+        self.amber_price, self.amber_scaled_price = (
+            self.forecast_and_scale_amber_prices()
+        )
         self.consumption, yesterday_solar = await self.get_yesterday_consumption()
         solar_forecast = self.forecast_solar()
         if len(solar_forecast) < len(self.amber_feed_in):
