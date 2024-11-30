@@ -1,7 +1,7 @@
 {
   "domain": "manage_energy",
   "name": "Manage Energy",
-  "version": "1.0.4",
+  "version": "1.0.5",
   "codeowners": [
     "@petehhhhhh"
   ],
