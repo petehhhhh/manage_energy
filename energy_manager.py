@@ -260,7 +260,9 @@ class manage_energy:
 
         # if battery will be charged before we next import power, don't charge
         if firstgridimport is None or (
-            battery_charged is not None and firstgridimport > battery_charged
+            battery_charged is not None
+            and firstgridimport > battery_charged
+            or actuals.battery_pct_level >= MAX_BATTERY_LEVEL
         ):
             return False
 
@@ -278,18 +280,34 @@ class manage_energy:
         else:
             blocks_to_check = first_no_grid_export
 
+        # find when next higher price is coming...
+        first_higher_price = None
+        for i, num in enumerate(self.forecasts.amber_scaled_price):
+            if num * 0.9 > actuals.scaled_price:
+                first_higher_price = i
+                break
+        # if i have a higher price upcoming that i will need to import for, check whether this is a good time...
         if (
-            actuals.scaled_price
-            # add a 10% buffer. So if it is less than 10% cheaper worth charging...
-            <= 0.9
-            * max(
-                sorted(self.forecasts.amber_scaled_price[0:blocks_to_check])[
-                    :blocks_to_charge
-                ]
-            )
-            and actuals.battery_pct_level < MAX_BATTERY_LEVEL
+            first_higher_price is not None
+            and first_higher_price < blocks_to_check
+            and first_higher_price < first_no_grid_export
         ):
-            return True
+            blocks_to_check = first_higher_price
+
+        blocks_to_charge = min(blocks_to_check + 1, blocks_to_charge)
+
+        if blocks_to_check == 0:
+            if actuals.scaled_price < 0.9 * self.forecasts.amber_scaled_price[0]:
+                return True
+        else:
+            if actuals.scaled_price <= max(
+                sorted(self.forecasts.amber_scaled_price[0 : blocks_to_check - 1])[
+                    : blocks_to_charge - 1
+                ]
+            ):
+                return True
+
+        # also check whether prices will be higher when we don't have enough power
 
         return False
 
