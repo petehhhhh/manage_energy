@@ -35,6 +35,9 @@ jobs:
           # Export the new version for later steps
           echo "new_version=$NEW_VERSION" >> $GITHUB_ENV
 
+      - name: Debug Version
+        run: echo "New Version: ${{ env.new_version }}"
+
       - name: Update hacs.json and manifest.json
         run: |
           # Update hacs.json and manifest.json with the new version
@@ -48,16 +51,20 @@ jobs:
           git config --local user.name "GitHub Actions"
           git config --local user.email "actions@github.com"
           git commit -m "Auto-bump version to v$NEW_VERSION" || echo "No changes to commit"
+        env:
+          NEW_VERSION: ${{ env.new_version }}
 
       - name: Push Changes
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NEW_VERSION: ${{ env.new_version }}
         run: |
           # Push the changes to the repository
           git push origin main || echo "No changes to push"
 
       - name: Create or Force Push Tag
         env:
+          NEW_VERSION: ${{ env.new_version }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           # Check if the tag exists in the remote
