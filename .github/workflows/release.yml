@@ -12,6 +12,8 @@ jobs:
     steps:
       - name: Checkout Code
         uses: actions/checkout@v3
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}  # Use the GitHub token for checkout
 
       - name: Set Up Node.js (Optional for HACS formatting validation)
         uses: actions/setup-node@v3
@@ -34,6 +36,8 @@ jobs:
           jq ".version = \"$NEW_VERSION\"" manifest.json > tmp_manifest.json && mv tmp_manifest.json manifest.json
 
       - name: Commit Version Updates
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           git config --local user.name "GitHub Actions"
           git config --local user.email "actions@github.com"
@@ -44,6 +48,7 @@ jobs:
       - name: Create Release
         uses: ncipollo/release-action@v1
         with:
+          token: ${{ secrets.GITHUB_TOKEN }}  # Use the GitHub token for release creation
           tag: "v$NEW_VERSION"
           name: "v$NEW_VERSION"
           commit: "main"
