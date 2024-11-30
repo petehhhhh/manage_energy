@@ -65,17 +65,20 @@ jobs:
           NEW_VERSION: ${{ env.new_version }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          # Fetch all remote tags to ensure local knowledge of existing tags
+          git fetch --tags
+
           # Check if the tag exists in the remote
           if git ls-remote --tags origin | grep -q "refs/tags/v$NEW_VERSION"; then
             echo "Tag v$NEW_VERSION already exists. Forcing update."
-            git tag -d "v$NEW_VERSION"
-            git push origin :refs/tags/v$NEW_VERSION
+            git tag -d "v$NEW_VERSION" || echo "Tag v$NEW_VERSION does not exist locally."
+            git push origin :refs/tags/v$NEW_VERSION || echo "Tag v$NEW_VERSION could not be deleted remotely."
           fi
 
           # Create and push the new tag
           git tag -a "v$NEW_VERSION" -m "Version v$NEW_VERSION"
           git push origin "v$NEW_VERSION"
-
+          
       - name: Create Release
         uses: ncipollo/release-action@v1
         with:
