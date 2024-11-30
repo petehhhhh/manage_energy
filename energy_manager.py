@@ -261,8 +261,8 @@ class manage_energy:
         if (
             actuals.feedin
             <= max(
-                sorted(self.forecasts.amber_scaled_price[0:firstgridimport])[
-                    :blocks_to_check
+                sorted(self.forecasts.amber_scaled_price[0:blocks_to_check])[
+                    :blocks_to_charge
                 ]
             )
             and actuals.battery_pct_level < MAX_BATTERY_LEVEL
@@ -414,7 +414,8 @@ class manage_energy:
                 elif self.should_i_charge_as_not_enough_solar():
                     await self.charge_battery()
                     await self.update_status(
-                        "Charging battery as cheap time to charge" + start_str
+                        "Charging battery as cheap time to charge before price rise at "
+                        + start_str
                     )
 
                 elif (
