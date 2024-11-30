@@ -15,7 +15,7 @@ from homeassistant.core import HomeAssistant, StateMachine  # type: ignore
 from homeassistant.components.recorder import get_instance  # type: ignore
 from homeassistant.components.recorder.history import state_changes_during_period  # type: ignore
 from homeassistant.helpers.event import async_track_time_interval, async_call_later  # type: ignore
-from .forecasts import Forecasts, Actuals
+from .forecasts import Forecasts, Actuals, is_demand_window
 from .tesla import TeslaCharging
 
 _LOGGER = logging.getLogger(__name__)
@@ -260,9 +260,9 @@ class manage_energy:
 
         # if battery will be charged before we next import power, don't charge
         if firstgridimport is None or (
-            battery_charged is not None
-            and firstgridimport > battery_charged
+            (battery_charged is not None and firstgridimport > battery_charged)
             or actuals.battery_pct_level >= MAX_BATTERY_LEVEL
+            or is_demand_window(datetime.datetime.now())
         ):
             return False
 
