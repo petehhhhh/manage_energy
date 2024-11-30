@@ -244,22 +244,25 @@ class manage_energy:
             )
             * 2
         )
-        
-        if firstgridimport < 7:
-            firstgridimport = 6
-            
+
         # if in the next six hours i am going to be exporting energy...
         firstgridimport = next(
             (i for i, num in enumerate(self.forecasts.export) if num < 0), None
         )
         if firstgridimport is None:
             return False
-
+        # if i am already about to export then check till when next postitive...
+        if firstgridimport < 8:
+            blocks_to_check = next(
+                (i for i, num in enumerate(self.forecasts.export) if num >= 0), None
+            )
+        else:
+            blocks_to_check = firstgridimport
         if (
             actuals.feedin
             <= max(
                 sorted(self.forecasts.amber_scaled_price[0:firstgridimport])[
-                    :blocks_to_charge
+                    :blocks_to_check
                 ]
             )
             and actuals.battery_pct_level < MAX_BATTERY_LEVEL
