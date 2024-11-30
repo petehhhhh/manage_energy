@@ -17,6 +17,7 @@ from homeassistant.components.recorder.history import state_changes_during_perio
 from homeassistant.helpers.event import async_track_time_interval, async_call_later  # type: ignore
 from .forecasts import Forecasts, Actuals, is_demand_window
 from .tesla import TeslaCharging
+from .analyse import Analysis
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -228,90 +229,8 @@ class manage_energy:
 
         return False
 
-    def should_i_charge_as_not_enough_solar(self) -> bool:
-        """Works out whether now is a good time to charge battery if going to be importing in the next forecast window."""
-        actuals = self.actuals
-        FORECAST_WINDOW = 24
-        # half an hour blocks it will take to charge...
-        blocks_to_charge = (
-            int(
-                round(
-                    (1 - (actuals.battery_pct_level / 100))
-                    * actuals.battery_max_usable_energy
-                    / BATTERY_DISCHARGE_RATE,
-                    0,
-                )
-            )
-            * 2
-        )
-        # If my battery level is not going to hit 100... or i am going to be importing power before it does
-        # and power cheap now. Top up..
-        battery_charged = next(
-            (
-                i
-                for i, num in enumerate(self.forecasts.battery_energy)
-                if num >= self.actuals.battery_max_energy
-            ),
-            None,
-        )
-        firstgridimport = next(
-            (i for i, num in enumerate(self.forecasts.export) if num < 0), None
-        )
-
-        # if battery will be charged before we next import power, don't charge
-        if firstgridimport is None or (
-            (battery_charged is not None and firstgridimport > battery_charged)
-            or actuals.battery_pct_level >= MAX_BATTERY_LEVEL
-            or is_demand_window(datetime.datetime.now())
-        ):
-            return False
-
-        if battery_charged is None or firstgridimport < battery_charged:
-            first_no_grid_export = None
-            for i, num in enumerate(self.forecasts.export):
-                if num >= 0 and i > firstgridimport:
-                    first_no_grid_export = i
-                    break
-
-        # else check for the blocks up to when it will be charged or for the entire window.
-
-        if battery_charged is None or first_no_grid_export is None:
-            blocks_to_check = FORECAST_WINDOW
-        else:
-            blocks_to_check = first_no_grid_export
-
-        # find when next higher price is coming...
-        first_higher_price = None
-        for i, num in enumerate(self.forecasts.amber_scaled_price):
-            if num * 0.9 > actuals.scaled_price:
-                first_higher_price = i
-                break
-        # if i have a higher price upcoming that i will need to import for, check whether this is a good time...
-        if (
-            first_higher_price is not None
-            and first_higher_price < blocks_to_check
-            and first_higher_price < first_no_grid_export
-        ):
-            blocks_to_check = first_higher_price
-
-        blocks_to_charge = min(blocks_to_check + 1, blocks_to_charge)
-
-        if blocks_to_check == 0:
-            if actuals.scaled_price < 0.9 * self.forecasts.amber_scaled_price[0]:
-                return True
-        else:
-            if actuals.scaled_price <= max(
-                sorted(self.forecasts.amber_scaled_price[0 : blocks_to_check - 1])[
-                    : blocks_to_charge - 1
-                ]
-            ):
-                return True
-
-        # also check whether prices will be higher when we don't have enough power
-
-        return False
-
     async def handle_manage_energy(self):
+        """Maing method in Manage_Energy."""
         try:
             if self._running:
                 return
@@ -324,114 +243,15 @@ class manage_energy:
 
             forecasts = self.forecasts
             await forecasts.build()
-            TTL_FORECAST_BLOCKS = 24
-            next12hours = forecasts.amber_feed_in[0:TTL_FORECAST_BLOCKS]
 
-            discharge_blocks_available = (
-                int(
-                    round(actuals.battery_max_usable_energy / BATTERY_DISCHARGE_RATE, 0)
-                )
-                * 2
-            )
+            a = Analysis(forecasts, actuals, self)
+            a.analyze_price_peaks()
 
-            # work out when in next 12 hours we can best use available blocks of discharge
-            max_values = sorted(next12hours, reverse=True)[
-                :(discharge_blocks_available)
-            ]
-
-            # get rid of max values that are less than the minimum margin
-            max_values = [
-                x for x in max_values if x > (min(next12hours) + self.minimum_margin)
-            ]
-
-            # find  when high prices start
-            start_high_prices = None
-            for index, value in enumerate(next12hours):
-                if value in max_values:
-                    start_high_prices = index
-                    break
-
-            # now find the first entry that has the minimum margin to export to grid. Trim the max values to ensure there is sufficient margin
-            insufficient_margin = True
-            end_high_prices = None
-            for index1, value1 in enumerate(max_values):
-                end_high_prices = None
-                for index, value in enumerate(next12hours):
-                    # if this entry is after the start of high prices and it is less than this value less required margin...
-                    if (index > start_high_prices) and (
-                        (value + self.minimum_margin) <= value1
-                    ):
-                        end_high_prices = index
-                        insufficient_margin = False
-                        break
-
-                if index1 == 0 and end_high_prices is None:
-                    # the max value in the array has too little margin
-                    break
-                elif end_high_prices is None:  # noqa: RET508
-                    # the last value in the max series doesn't have enough margin. Probably shouldnt happen as check above...
-                    max_values = max_values[:(index1)]
-                    end_high_prices = last_end_high_prices
-                    insufficient_margin = False
-                    break
-
-                last_end_high_prices = end_high_prices
-
-            # if we didn't find one then check that the current price is the tail of the peak
-            available_max_values = None
-            if end_high_prices is None:
-                if actuals.feedin >= (next12hours[0] + self.minimum_margin):
-                    insufficient_margin = False
-                else:
-                    insufficient_margin = True
-            else:
-                # failsafe as can get abberations in data - don't discharge if current price isn't greater than the minimum margin over next 5 hours
-                if actuals.feedin < (min(next12hours) + self.minimum_margin):
-                    insufficient_margin = True
-                # to give us how many blocks of high prices we have
-                blocks_till_price_drops = end_high_prices - start_high_prices
-
-                # recalculate actual half hour blocks of discharge available less enough battery to cover consumption
-                available_max_values = max_values
-                energy_to_discharge = float(
-                    actuals.available_battery_energy
-                    - sum(forecasts.consumption[0 : blocks_till_price_drops - 1])
-                )
-                discharge_blocks_available = int(
-                    round(energy_to_discharge / BATTERY_DISCHARGE_RATE * 2 + 0.5, 0)
-                )
-                if discharge_blocks_available < 1:
-                    discharge_blocks_available = 0
-                if discharge_blocks_available < len(max_values):
-                    available_max_values = max_values[:(discharge_blocks_available)]
-                # if i have less available max values then make sure current actuals included in available valuess.
-                if len(
-                    available_max_values
-                ) < discharge_blocks_available and actuals.feedin >= (
-                    min(next12hours) + self.minimum_margin
-                ):
-                    available_max_values.append(actuals.feedin)
-
-            # estimate how much solar power we will have at time of peak power
-
-            start_str = ""
-            if start_high_prices != None:
-                battery_at_peak = forecasts.battery_energy[start_high_prices]
-                start_time = forecasts.start_time[start_high_prices]
-                start_time = forecasts.format_date(start_time)
-                start_str = start_time.strftime("%I:%M%p")
             await self.clear_status()
-
             tesla = TeslaCharging(self)
 
             tesla_charging = await tesla.tesla_charging(forecasts)
             # Now we can now make a decision if we start to feed in...
-
-            # scaled minimum margin to avoid eg charging at $15 when it is forecast to be $15.50... High risk of disappointment...
-            if actuals.feedin > 0.5:
-                scaled_min_margin = self.minimum_margin / 0.20 * actuals.feedin
-            else:
-                scaled_min_margin = self.minimum_margin
 
             if self._auto:
                 # if i have available energy and the actual is as good as it gets in the next five hours (with margin) or there is a price spike in the next 5 hours and this is one of the best opportunities...
@@ -439,33 +259,34 @@ class manage_energy:
                     (
                         # if it is currently 90% of the maximum forecsated and there is acceptable margin then take it !
                         actuals.feedin
-                        >= (0.9 * float(max(next12hours[0:10]) + scaled_min_margin))
+                        >= (0.9 * float(max(a.next12hours[0:10]) + a.scaled_min_margin))
                     )
                     or (
                         # otherwise if it is moire than the max values (that already are calced with minimum margin)
-                        available_max_values != None
-                        and len(available_max_values) > 0
-                        and actuals.feedin >= 0.9 * min(available_max_values)
+                        a.available_max_values is not None
+                        and len(a.available_max_values) > 0
+                        and actuals.feedin >= 0.9 * min(a.available_max_values)
                     )
                 ):
                     await self.update_status("Discharging into Price Spike")
                     await self.discharge_battery()
 
-                elif self.should_i_charge_as_not_enough_solar():
+                elif a.should_i_charge_as_not_enough_solar():
                     await self.charge_battery()
                     await self.update_status(
                         "Charging battery as cheaper time to charge."
                     )
 
                 elif (
-                    len(max_values) > 0
-                    and actuals.scaled_price + scaled_min_margin < (max_values[0] * 0.9)
-                    and battery_at_peak < actuals.battery_max_energy
+                    len(a.max_values) > 0
+                    and actuals.scaled_price + a.scaled_min_margin
+                    < (a.max_values[0] * 0.9)
+                    and a.battery_at_peak < actuals.battery_max_energy
                     and actuals.battery_pct_level < MAX_BATTERY_LEVEL
                 ):
                     await self.update_status(
                         "Making sure battery charged for upcoming price spike at "
-                        + start_str
+                        + a.peak_start_str
                     )
                     await self.charge_battery()
 
@@ -474,9 +295,9 @@ class manage_energy:
                     await self.update_status("Charging from Solar while charging Tesla")
 
                 else:
-                    if not insufficient_margin:
+                    if not a.insufficient_margin:
                         await self.update_status(
-                            "Maximising current usage. Next peak at " + start_str
+                            "Maximising current usage. Next peak at " + a.start_str
                         )
                     else:
                         await self.update_status("Maximising current usage.")
