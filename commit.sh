@@ -15,9 +15,13 @@ echo "Staging changes..."
 pushd .
 cd $REPO_PATH
 
+# Pull the latest changes and merge
+echo "Pulling latest changes from the remote repository..."
+git pull origin main --rebase
+
+# Stage and commit changes
 git add .
 echo "Committing changes with message: $COMMIT_MESSAGE"
-git pull
 git commit -m "$COMMIT_MESSAGE"
 
 # Step 2: Push changes to GitHub
