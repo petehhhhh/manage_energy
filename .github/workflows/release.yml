@@ -15,38 +15,50 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Set Up Node.js (Optional for HACS formatting validation)
-        uses: actions/setup-node@v3
-        with:
-          node-version: 18
-
       - name: Auto-Increment Version
         id: version
         run: |
+          # Extract the current version from hacs.json
           CURRENT_VERSION=$(jq -r '.version' hacs.json)
           echo "Current Version: $CURRENT_VERSION"
+
+          # If no version is found, start at 1.0.0
+          if [[ -z "$CURRENT_VERSION" || "$CURRENT_VERSION" == "null" ]]; then
+            CURRENT_VERSION="1.0.0"
+          fi
+
+          # Increment the patch version
           IFS='.' read -r MAJOR MINOR PATCH <<< "$CURRENT_VERSION"
           NEW_VERSION="$MAJOR.$MINOR.$((PATCH + 1))"
           echo "New Version: $NEW_VERSION"
+
+          # Make the new version available to other steps
           echo "new_version=$NEW_VERSION" >> $GITHUB_ENV
 
       - name: Update hacs.json and manifest.json
         run: |
+          # Update hacs.json and manifest.json with the new version
           jq ".version = \"$NEW_VERSION\"" hacs.json > tmp_hacs.json && mv tmp_hacs.json hacs.json
           jq ".version = \"$NEW_VERSION\"" manifest.json > tmp_manifest.json && mv tmp_manifest.json manifest.json
-        env:
-          NEW_VERSION: ${{ env.new_version }}
 
-      - name: Commit Version Updates
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          NEW_VERSION: ${{ env.new_version }}
-        run: |
+          # Stage changes for commit
+          git add hacs.json manifest.json
+
+          # Commit the version bump
           git config --local user.name "GitHub Actions"
           git config --local user.email "actions@github.com"
-          git add hacs.json manifest.json
-          git commit -m "Auto-bump version to v${{ env.new_version }}"
+          git commit -m "Auto-bump version to v$NEW_VERSION" || echo "No changes to commit"
+
+      - name: Push Changes and Tag
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Push the changes to the repository
           git push origin main
+
+          # Create a new tag for the version
+          git tag -a "v$NEW_VERSION" -m "Version v$NEW_VERSION"
+          git push origin "v$NEW_VERSION"
 
       - name: Create Release
         uses: ncipollo/release-action@v1
@@ -54,5 +66,4 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           tag: "v${{ env.new_version }}"
           name: "v${{ env.new_version }}"
-          commit: "main"
           body: "Auto-generated release for version v${{ env.new_version }}"
