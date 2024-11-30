@@ -244,20 +244,40 @@ class manage_energy:
             )
             * 2
         )
-
-        # if in the next six hours i am going to be exporting energy...
+        # If my battery level is not going to hit 100... or i am going to be importing power before it does
+        # and power cheap now. Top up..
+        battery_charged = next(
+            (
+                i
+                for i, num in enumerate(self.forecasts.battery_energy)
+                if num >= self.actuals.battery_max_energy
+            ),
+            None,
+        )
         firstgridimport = next(
             (i for i, num in enumerate(self.forecasts.export) if num < 0), None
         )
-        if firstgridimport is None:
+
+        # if battery will be charged before we next import power, don't charge
+        if firstgridimport is None or (
+            battery_charged is not None and firstgridimport > battery_charged
+        ):
             return False
-        # if i am already about to export then check till when next postitive...
-        if firstgridimport < 8:
-            blocks_to_check = next(
-                (i for i, num in enumerate(self.forecasts.export) if num >= 0), None
-            )
+
+        if battery_charged is None or firstgridimport < battery_charged:
+            first_no_grid_export = None
+            for i, num in enumerate(self.forecasts.export):
+                if num >= 0 and i > firstgridimport:
+                    first_no_grid_export = i
+                    break
+
+        # else check for the blocks up to when it will be charged or for the entire window.
+
+        if battery_charged is None or first_no_grid_export is None:
+            blocks_to_check = FORECAST_WINDOW
         else:
-            blocks_to_check = firstgridimport
+            blocks_to_check = first_no_grid_export
+
         if (
             actuals.scaled_price
             # add a 10% buffer. So if it is less than 10% cheaper worth charging...
