@@ -36,8 +36,7 @@ jobs:
           echo "new_version=$NEW_VERSION" >> $GITHUB_ENV
 
       - name: Debug Version
-        run: echo "New Version: ${{ env.new_version }}"
-
+        run: echo "New Version:${{ env.new_version }}"
       - name: Update hacs.json and manifest.json
         run: |
           # Update hacs.json and manifest.json with the new version
