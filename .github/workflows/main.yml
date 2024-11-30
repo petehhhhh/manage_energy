@@ -1,0 +1,50 @@
+name: Manage Releases
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  versioning-and-release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      - name: Set Up Node.js (Optional for HACS formatting validation)
+        uses: actions/setup-node@v3
+        with:
+          node-version: 18
+
+      - name: Auto-Increment Version
+        id: version
+        run: |
+          CURRENT_VERSION=$(jq -r '.version' hacs.json)
+          echo "Current Version: $CURRENT_VERSION"
+          IFS='.' read -r MAJOR MINOR PATCH <<< "$CURRENT_VERSION"
+          NEW_VERSION="$MAJOR.$MINOR.$((PATCH + 1))"
+          echo "New Version: $NEW_VERSION"
+          echo "new_version=$NEW_VERSION" >> $GITHUB_ENV
+
+      - name: Update hacs.json and manifest.json
+        run: |
+          jq ".version = \"$NEW_VERSION\"" hacs.json > tmp_hacs.json && mv tmp_hacs.json hacs.json
+          jq ".version = \"$NEW_VERSION\"" manifest.json > tmp_manifest.json && mv tmp_manifest.json manifest.json
+
+      - name: Commit Version Updates
+        run: |
+          git config --local user.name "GitHub Actions"
+          git config --local user.email "actions@github.com"
+          git add hacs.json manifest.json
+          git commit -m "Auto-bump version to v$NEW_VERSION"
+          git push origin main
+
+      - name: Create Release
+        uses: ncipollo/release-action@v1
+        with:
+          tag: "v$NEW_VERSION"
+          name: "v$NEW_VERSION"
+          commit: "main"
+          body: "Auto-generated release for version v$NEW_VERSION"
