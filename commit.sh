@@ -14,9 +14,10 @@ fi
 echo "Staging changes..."
 pushd .
 cd $REPO_PATH
-git pull
+
 git add .
 echo "Committing changes with message: $COMMIT_MESSAGE"
+git pull
 git commit -m "$COMMIT_MESSAGE"
 
 # Step 2: Push changes to GitHub
