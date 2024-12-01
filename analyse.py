@@ -60,25 +60,25 @@ class Analysis:
 
         # find  when high prices start
         self.start_high_prices = None
-        for index, value in enumerate(next12hours):
+        for index, value in enumerate(self.next12hours):
             if value in self.max_values:
                 self.start_high_prices = index
                 break
 
-            # now find the first entry that has the minimum margin to export to grid. Trim the max values to ensure there is sufficient margin
-            self.insufficient_margin = True
+        # now find the first entry that has the minimum margin to export to grid. Trim the max values to ensure there is sufficient margin
+        self.insufficient_margin = True
+        self.end_high_prices = None
+        last_end_high_prices = None
+        for index1, value1 in enumerate(self.max_values):
             self.end_high_prices = None
-            last_end_high_prices = None
-            for index1, value1 in enumerate(self.max_values):
-                self.end_high_prices = None
-                for index, value in enumerate(next12hours):
-                    # if this entry is after the start of high prices and it is less than this value less required margin...
-                    if (
-                        self.start_high_prices is None or index > self.start_high_prices
-                    ) and ((value + self._minimum_margin) <= value1):
-                        self.end_high_prices = index
-                        self.insufficient_margin = False
-                        break
+            for index, value in enumerate(next12hours):
+                # if this entry is after the start of high prices and it is less than this value less required margin...
+                if (
+                    self.start_high_prices is None or index > self.start_high_prices
+                ) and ((value + self._minimum_margin) <= value1):
+                    self.end_high_prices = index
+                    self.insufficient_margin = False
+                    break
 
                 if index1 == 0 and self.end_high_prices is None:
                     # the max value in the array has too little margin
@@ -92,51 +92,48 @@ class Analysis:
 
                 last_end_high_prices = self.end_high_prices  # noqa: F841
 
-            if self.start_high_prices is None:
-                return
-
-            # if we didn't find one then check that the current price is the tail of the peak
-            self.available_max_values = None
-            if self.end_high_prices is None:
-                if actuals.feedin >= (next12hours[0] + self._minimum_margin):
-                    self.insufficient_margin = False
-                else:
-                    self.insufficient_margin = True
+        # if we didn't find one then check that the current price is the tail of the peak
+        self.available_max_values = None
+        if self.end_high_prices is None:
+            if actuals.feedin >= (next12hours[0] + self._minimum_margin):
+                self.insufficient_margin = False
             else:
-                # failsafe as can get abberations in data - don't discharge if current price isn't greater than the minimum margin over next 5 hours
-                if actuals.feedin < (min(next12hours) + self._minimum_margin):
-                    self.insufficient_margin = True
-                # to give us how many blocks of high prices we have
+                self.insufficient_margin = True
+        else:
+            # failsafe as can get abberations in data - don't discharge if current price isn't greater than the minimum margin over next 5 hours
+            if actuals.feedin < (min(next12hours) + self._minimum_margin):
+                self.insufficient_margin = True
+            # to give us how many blocks of high prices we have
 
-                blocks_till_price_drops = self.end_high_prices - self.start_high_prices
+            blocks_till_price_drops = self.end_high_prices - self.start_high_prices
 
-                # recalculate actual half hour blocks of discharge available less enough battery to cover consumption
-                self.available_max_values = self.max_values
-                energy_to_discharge = float(
-                    actuals.available_battery_energy
-                    - sum(forecasts.consumption[0 : blocks_till_price_drops - 1])
-                )
-                self.discharge_blocks_available = int(
-                    round(energy_to_discharge / BATTERY_DISCHARGE_RATE * 2 + 0.5, 0)
-                )
-                if self.discharge_blocks_available < 1:
-                    self.discharge_blocks_available = 0
-                if self.discharge_blocks_available < len(self.max_values):
-                    self.available_max_values = self.max_values[
-                        : self.discharge_blocks_available
-                    ]
-                # if i have less available max values then make sure current actuals included in available valuess.
-                if len(
-                    self.available_max_values
-                ) < self.discharge_blocks_available and actuals.feedin >= (
-                    min(next12hours) + self._minimum_margin
-                ):
-                    self.available_max_values.append(actuals.feedin)
+            # recalculate actual half hour blocks of discharge available less enough battery to cover consumption
+            self.available_max_values = self.max_values
+            energy_to_discharge = float(
+                actuals.available_battery_energy
+                - sum(forecasts.consumption[0 : blocks_till_price_drops - 1])
+            )
+            self.discharge_blocks_available = int(
+                round(energy_to_discharge / BATTERY_DISCHARGE_RATE * 2 + 0.5, 0)
+            )
+            if self.discharge_blocks_available < 1:
+                self.discharge_blocks_available = 0
+            if self.discharge_blocks_available < len(self.max_values):
+                self.available_max_values = self.max_values[
+                    : self.discharge_blocks_available
+                ]
+            # if i have less available max values then make sure current actuals included in available valuess.
+            if len(
+                self.available_max_values
+            ) < self.discharge_blocks_available and actuals.feedin >= (
+                min(next12hours) + self._minimum_margin
+            ):
+                self.available_max_values.append(actuals.feedin)
 
-            # estimate how much solar power we will have at time of peak power
+        # estimate how much solar power we will have at time of peak power
 
-            if self.start_high_prices != None:
-                self.battery_at_peak = forecasts.battery_energy[self.start_high_prices]
-                self.peak_start_time = forecasts.start_time[self.start_high_prices]
-                self.peak_start_time = forecasts.format_date(self.peak_start_time)
-                self.peak_start_str = self.peak_start_time.strftime("%I:%M%p")
+        if self.start_high_prices != None:
+            self.battery_at_peak = forecasts.battery_energy[self.start_high_prices]
+            self.peak_start_time = forecasts.start_time[self.start_high_prices]
+            self.peak_start_time = forecasts.format_date(self.peak_start_time)
+            self.peak_start_str = self.peak_start_time.strftime("%I:%M%p")

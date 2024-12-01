@@ -283,6 +283,7 @@ class manage_energy:
         except Exception as e:
             error_details = traceback.format_exc()
             self.update_status("Error: " + str(e))
-            raise RuntimeError("Error in handle_manage_energy: " + str(e))
         finally:
+            # if failing, make sure set to Maximise Energy
+            self.set_mode(PowerSelectOptions.MAXIMISE)
             self._running = False
