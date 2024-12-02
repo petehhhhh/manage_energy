@@ -171,6 +171,6 @@ class TeslaCharging:
             error_message = traceback.format_exc()
             # Log the error with the traceback
             _LOGGER.error(
-                f"Error in Tesla_Charging: {msg}. Traceback:\n {error_message}\n\n"  # noqa: G004
+                f"Error in Tesla_Charging: {error_message}\n"  # noqa: G004
             )
             return False

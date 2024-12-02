@@ -86,13 +86,11 @@ class manage_energy:
     def update_status(self, msg):
         """Write a status msg to status field and log it."""
         msg = msg.strip()
-        if msg[-1] != ".":  # add a full stop if not there
-            msg = msg + "."
 
         if self._state == "":
             self._state = msg
         else:
-            self._state = self._state + " " + msg
+            self._state = self._state + ". " + msg
 
         _LOGGER.info(msg)
         self._notify_listeners()
@@ -251,12 +249,15 @@ class manage_energy:
                     self.update_status("Curtailing solar")
                 else:
                     await self.uncurtail_solar()
+            else:
+                self.update_status("Auto disabled")
 
         except Exception as e:
             error_details = traceback.format_exc()
             self.update_status("Error: " + str(e))
             _LOGGER.error("Error: " + str(e) + "\n" + error_details)
             self.set_mode(PowerSelectOptions.MAXIMISE)
+
         finally:
             # if failing, make sure set to Maximise Energy
 

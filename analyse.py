@@ -44,7 +44,7 @@ class Analysis:
         for index, value in enumerate(self.next12hours):
             # if this entry is after the start of high prices and it is less than this value less required margin...
             if (self.start_high_prices is None or index > self.start_high_prices) and (
-                (value + self._minimum_margin) <= value1
+                self.has_sufficient_margin(value1, value)
             ):
                 self.end_high_prices = index
                 self.insufficient_margin = False
@@ -96,6 +96,10 @@ class Analysis:
             # this is at the end of the second for loop
             last_end_high_prices = self.end_high_prices  # noqa: F841
 
+    def has_sufficient_margin(self, value: float, baseline: float) -> bool:
+        """Check if the value has sufficient margin."""
+        return value >= (baseline + self._minimum_margin)
+
     def calc_blocks_available_for_discharge(self):
         """Calculate block available to discharge and best available max values."""
 
@@ -121,8 +125,8 @@ class Analysis:
         # if i have less available max values then make sure current actuals included in available valuess.
         if len(
             self.available_max_values
-        ) < self.discharge_blocks_available and self.actuals.feedin >= (
-            min(self.next12hours) + self._minimum_margin
+        ) < self.discharge_blocks_available and self.has_sufficient_margin(
+            self.actuals.feedin, min(self.next12hours)
         ):
             self.available_max_values.append(self.actuals.feedin)
 
@@ -144,7 +148,7 @@ class Analysis:
 
         # if we didn't find one then check that the current price is the tail of the peak
         if self.end_high_prices is None:
-            if actuals.feedin >= (self.next12hours[0] + self._minimum_margin):
+            if self.has_sufficient_margin(actuals.feedin, self.next12hours[0]):
                 self.insufficient_margin = False
             else:
                 self.insufficient_margin = True
