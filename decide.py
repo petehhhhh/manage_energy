@@ -114,13 +114,16 @@ class Should_i_charge_as_not_enough_solar(baseDecide):
         )
 
         # if battery will be charged before we next import power, don't charge
+
         if firstgridimport is None or (
             (battery_charged is not None and firstgridimport > battery_charged)
             or actuals.battery_pct_level >= MAX_BATTERY_LEVEL
             or is_demand_window(datetime.datetime.now())
         ):
+            _LOGGER.error("No grid imports forecast")
             return False
 
+        _LOGGER.error("Firstgridimport = " + str(firstgridimport))
         if battery_charged is None or firstgridimport < battery_charged:
             first_no_grid_export = None
             for i, num in enumerate(self.forecasts.export):
@@ -135,7 +138,15 @@ class Should_i_charge_as_not_enough_solar(baseDecide):
         else:
             blocks_to_check = first_no_grid_export
 
+        _LOGGER.error(
+            "Blocks to check  = "
+            + str(blocks_to_check)
+            + ", blocks to charge = "
+            + str(blocks_to_charge)
+        )
+
         blocks = self.forecasts.amber_scaled_price[0 : blocks_to_check - 1]
+
         if len(blocks) == 0:
             return False
         # check whether a better time to charge. Should really work out how many blocks we need mim but on future iterations, should then eliminate export and never hit here. We will see...
