@@ -21,6 +21,7 @@ from .analyse import Analysis
 
 _LOGGER = logging.getLogger(__name__)
 
+
 class BatteryPlanner():
     """Build a 12 hour forecast of what the battery will do."""
 

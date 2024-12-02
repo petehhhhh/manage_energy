@@ -10,13 +10,7 @@ from .const import (
 import logging
 import datetime
 import traceback
-from .decide import (
-    Should_i_charge_as_not_enough_solar,
-    ShouldIDischarge,
-    ShouldIChargeforPriceSpike,
-    PreserveWhileTeslaCharging,
-    MaximiseUsage,
-)
+from .decide import Decide_Battery_Action
 from homeassistant.core import HomeAssistant, StateMachine  # type: ignore
 from homeassistant.components.recorder import get_instance  # type: ignore
 from homeassistant.components.recorder.history import state_changes_during_period  # type: ignore
@@ -245,40 +239,18 @@ class manage_energy:
             self.tesla_charging = await tesla.tesla_charging(forecasts)
             # Now we can now make a decision if we start to feed in...
 
-            # lambda functions allow to load into an array of rules. Rules are defined in decide.py
             if self._auto:
-                rules = [
-                    lambda: ShouldIDischarge(a).run(
-                        PowerSelectOptions.DISCHARGE, "Discharging into Price Spike"
-                    ),
-                    lambda: Should_i_charge_as_not_enough_solar(a).run(
-                        PowerSelectOptions.CHARGE, "Charging as cheaper now."
-                    ),
-                    lambda: ShouldIChargeforPriceSpike(a).run(
-                        PowerSelectOptions.CHARGE,
-                        "Charging for price spike at " + a.peak_start_str,
-                    ),
-                    lambda: PreserveWhileTeslaCharging(a).run(
-                        PowerSelectOptions.OFF, "Preserving charge"
-                    ),
-                    lambda: MaximiseUsage(a).run(
-                        PowerSelectOptions.MAXIMISE, "Maximising usage"
-                    ),
-                ]
-                # and will run one by one, stopping when the first is succesful. The last maximise usage is always successful.
-                for rule in rules:
-                    if rule():
-                        break
+                Decide_Battery_Action(self, a)
 
-            if (
-                not self.tesla_charging
-                and actuals.battery_pct_level >= CURTAIL_BATTERY_LEVEL
-                and actuals.feedin < 0
-            ):
-                await self.curtail_solar()
-                self.update_status("Curtailing solar")
-            else:
-                await self.uncurtail_solar()
+                if (
+                    not self.tesla_charging
+                    and self.actuals.battery_pct_level >= CURTAIL_BATTERY_LEVEL
+                    and self.actuals.feedin < 0
+                ):
+                    await self.curtail_solar()
+                    self.update_status("Curtailing solar")
+                else:
+                    await self.uncurtail_solar()
 
         except Exception as e:
             error_details = traceback.format_exc()

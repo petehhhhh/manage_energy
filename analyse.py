@@ -29,6 +29,8 @@ class Analysis:
         self.peak_start_str = ""
         self.peak_start_time = None
         self._minimum_margin = hub.minimum_margin
+        self.next12hours = []
+        self.charge_blocks_required_for_peak = 0
 
         # scaled minimum margin to avoid eg charging at $15 when it is forecast to be $15.50... High risk of disappointment...
         if actuals.feedin > 0.5:
@@ -36,8 +38,20 @@ class Analysis:
         else:
             self.scaled_min_margin = self._minimum_margin
 
+    def find_index_of_first_entry_that_is_less_than_this(self, value1):
+        """Iterate through next12hours and find the first value after this one that with margin is less than this one."""
+
+        for index, value in enumerate(self.next12hours):
+            # if this entry is after the start of high prices and it is less than this value less required margin...
+            if (self.start_high_prices is None or index > self.start_high_prices) and (
+                (value + self._minimum_margin) <= value1
+            ):
+                self.end_high_prices = index
+                self.insufficient_margin = False
+                break
+
     def find_start_and_end_high_prices(self):
-        """finds the start of high prices and stores in self.start_high_prices"""
+        """finds the start of high prices and stores in self.start_high_prices."""
 
         # work out when in next 12 hours we can best use available blocks of discharge
         self.max_values = sorted(self.next12hours, reverse=True)[
@@ -64,26 +78,23 @@ class Analysis:
         last_end_high_prices = None
         for index1, value1 in enumerate(self.max_values):
             self.end_high_prices = None
-            for index, value in enumerate(self.next12hours):
-                # if this entry is after the start of high prices and it is less than this value less required margin...
-                if (
-                    self.start_high_prices is None or index > self.start_high_prices
-                ) and ((value + self._minimum_margin) <= value1):
-                    self.end_high_prices = index
-                    self.insufficient_margin = False
-                    break
 
-                if index1 == 0 and self.end_high_prices is None:
-                    # the max value in the array has too little margin
-                    break
-                elif self.end_high_prices is None:  # noqa: RET508
-                    # the last value in the max series doesn't have enough margin. Probably shouldnt happen as check above...
-                    self.max_values = self.max_values[:(index1)]
-                    self.end_high_prices = last_end_high_prices
-                    self.insufficient_margin = False
-                    break
+            self.find_index_of_first_entry_that_is_less_than_this(value1)
 
-                last_end_high_prices = self.end_high_prices  # noqa: F841
+            # exception checks for max_values where max is less than margin
+            if index1 == 0 and self.end_high_prices is None:
+                # the max value in the max values array has too little margin
+                break
+
+            elif self.end_high_prices is None:  # noqa: RET508
+                # the last value in the max series doesn't have enough margin. Probably shouldnt happen as check above...
+                self.max_values = self.max_values[:(index1)]
+                self.end_high_prices = last_end_high_prices
+                self.insufficient_margin = False
+                break
+
+            # this is at the end of the second for loop
+            last_end_high_prices = self.end_high_prices  # noqa: F841
 
     def calc_blocks_available_for_discharge(self):
         """Calculate block available to discharge and best available max values."""
@@ -129,8 +140,9 @@ class Analysis:
 
         self.find_start_and_end_high_prices()
 
-        # if we didn't find one then check that the current price is the tail of the peak
         self.available_max_values = None
+
+        # if we didn't find one then check that the current price is the tail of the peak
         if self.end_high_prices is None:
             if actuals.feedin >= (self.next12hours[0] + self._minimum_margin):
                 self.insufficient_margin = False
@@ -140,9 +152,21 @@ class Analysis:
             # calculate blocks available for discharge
             self.calc_blocks_available_for_discharge()
 
-        # estimate how much solar power we will have at time of peak power
-
         if self.start_high_prices is not None:
+            # estimate how much solar power we will have at time of peak power
+
+            self.charge_blocks_required_for_peak = int(
+                (
+                    (
+                        actuals.battery_max_usable_energy
+                        - forecasts.battery_energy[self.start_high_prices]
+                    )
+                    / BATTERY_DISCHARGE_RATE
+                    * 2
+                )
+                + 1
+            )
+
             self.battery_at_peak = forecasts.battery_energy[self.start_high_prices]
             self.peak_start_time = forecasts.start_time[self.start_high_prices]
             self.peak_start_time = forecasts.format_date(self.peak_start_time)

@@ -3,7 +3,7 @@ from .const import BATTERY_DISCHARGE_RATE, MAX_BATTERY_LEVEL, PowerSelectOptions
 
 import datetime
 import logging
-from .const import MAX_BATTERY_LEVEL
+from .const import MAX_BATTERY_LEVEL, CURTAIL_BATTERY_LEVEL
 from homeassistant.core import HomeAssistant, StateMachine  # type: ignore
 from homeassistant.components.recorder import get_instance  # type: ignore
 from homeassistant.components.recorder.history import state_changes_during_period  # type: ignore
@@ -12,6 +12,41 @@ from .forecasts import Forecasts, Actuals, is_demand_window
 from .analyse import Analysis
 
 _LOGGER = logging.getLogger(__name__)
+
+
+def Decide_Battery_Action(hub, a: Analysis):
+    """Run rules to decide what action to take with battery."""
+
+    # lambda functions allow to load into an array of rules. Rules are defined in decide.py
+
+    if hub.get_auto():
+        rules = [
+            lambda: ShouldIDischarge(a).run(
+                PowerSelectOptions.DISCHARGE, "Discharging into Price Spike"
+            ),
+            lambda: Should_i_charge_as_not_enough_solar(a).run(
+                PowerSelectOptions.CHARGE, "Charging as cheaper now."
+            ),
+            lambda: ShouldIChargeforPriceSpike(a).run(
+                PowerSelectOptions.CHARGE,
+                "Charging for price spike at " + a.peak_start_str,
+            ),
+            lambda: PreserveWhileTeslaCharging(a).run(
+                PowerSelectOptions.OFF, "Preserving charge"
+            ),
+            lambda: MaximiseUsage(a).run(
+                PowerSelectOptions.MAXIMISE, "Maximising usage"
+            ),
+        ]
+        # and will run one by one, stopping when the first is successful. The last maximise usage should always be successful.
+        for rule in rules:
+            try:
+                if rule():
+                    break
+            except Exception as e:
+                hub.update_status("Rule failed: " + str(e))
+                _LOGGER.error("Rule failed: " + str(e) + "\n" + error_details)
+            # will contnue onto next rule
 
 
 class baseDecide:
@@ -176,13 +211,22 @@ class ShouldIChargeforPriceSpike(baseDecide):
         """ "Evaluate rule."""
 
         if (
-            len(self.a.max_values) > 0
+            self.a.start_high_prices is not None
+            and len(self.a.max_values) > 0
             and self.actuals.scaled_price + self.a.scaled_min_margin
             < (self.a.max_values[0] * 0.9)
             and self.a.battery_at_peak < self.actuals.battery_max_energy
+            and self.actuals.scaled_price
+            # if this is one of the cheapest prices to charge the battery before the price spike..
+            <= max(
+                sorted(self.forecasts.amber_scaled_price[0 : self.a.start_high_prices])[
+                    0 : self.a.charge_blocks_required_for_peak
+                ]
+            )
             and self.actuals.battery_pct_level < MAX_BATTERY_LEVEL
         ):
             return True
+
         return False
 
 
