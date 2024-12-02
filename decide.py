@@ -147,7 +147,7 @@ class Should_i_charge_as_not_enough_solar(baseDecide):
             and first_higher_price < blocks_to_check
             and (
                 first_no_grid_export is None
-                or first_higher_price < first_no_grid_export
+                or first_higher_price >= first_no_grid_export
             )
         ):
             blocks_to_check = first_higher_price
