@@ -153,7 +153,7 @@ class Analysis:
             else:
                 self.insufficient_margin = True
         else:
-            # calculate blocks available for discharge
+            # calculate blocks available for
             self.calc_blocks_available_for_discharge()
 
         if self.start_high_prices is not None:
@@ -166,7 +166,7 @@ class Analysis:
                         - forecasts.battery_energy[self.start_high_prices]
                     )
                     / BATTERY_DISCHARGE_RATE
-                    * 2
+                    * 2.5  # add buffer to calcs to ensure charged
                 )
                 + 1
             )

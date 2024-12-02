@@ -7,8 +7,16 @@ from homeassistant.core import callback
 async def async_setup_entry(hass, config_entry, async_add_entities):
     hub = hass.data[DOMAIN][config_entry.entry_id]
     name = config_entry.data["host"]
-    async_add_entities([PowerModeSelect(name + "_PowerMode", config_entry.title + " Power Mode", hub),
-                        TeslaModeSelect(name + " _TeslaMode", config_entry.title + " Tesla Mode", hub)])
+    async_add_entities(
+        [
+            PowerModeSelect(
+                name + "_PowerMode", config_entry.title + " Power Mode", hub
+            ),
+            TeslaModeSelect(
+                name + " _TeslaMode", config_entry.title + " Tesla Mode", hub
+            ),
+        ]
+    )
 
 
 class BaseSelect(SelectEntity):
@@ -95,7 +103,6 @@ class BaseSelect(SelectEntity):
     def set_available(self, available: bool) -> None:
         """Set availability."""
         self._available = available
-       
 
 
 class TeslaModeSelect(BaseSelect):
@@ -124,36 +131,36 @@ class PowerModeSelect(BaseSelect):
 
         self._options = [option.value for option in PowerSelectOptions]
         super().__init__(select_id, name, hub)
-        #self._available = not self._hub.get_auto()
-        
+        # self._available = not self._hub.get_auto()
 
     @property
     def available(self) -> bool:
-    # Return True if auto mode not enabled unless already been set unavailable
-        #self._available = not self._hub.get_auto()
+        # Return True if auto mode not enabled unless already been set unavailable
+        # self._available = not self._hub.get_auto()
         return self._available
 
-    def select_option(self,option:str) -> None:
+    def select_option(self, option: str) -> None:
         """Change the selected option."""
         self._state = option
         self._attributes["state"] = self._state
-    
+
     async def async_select_option(self, option: str) -> None:
-        #used when component changes when required
+        # used when component changes when required
         self.select_option(option)
         self.set_available(False)
         try:
-            await self._hub.set_mode(option)
+            self._hub.set_mode(option)
         finally:
             self.set_available(True)
-    
+
     async def async_added_to_hass(self):
         """Handle when the entity is added to Home Assistant."""
+
         @callback
         def async_auto_switch_state_listener(event):
             """React to changes in the auto_switch state."""
             self.async_schedule_update_ha_state()
-        
+
         @callback
         def async_mode_change_listener(event):
             """React to changes in the auto_switch state."""
@@ -161,6 +168,5 @@ class PowerModeSelect(BaseSelect):
             self.async_schedule_update_ha_state()
 
         # Listen for changes in the auto_switch state
-        self.hass.bus.async_listen(
-            "state_changed", async_auto_switch_state_listener)
-        self._hub.add_listener(async_mode_change_listener)  
+        self.hass.bus.async_listen("state_changed", async_auto_switch_state_listener)
+        self._hub.add_listener(async_mode_change_listener)

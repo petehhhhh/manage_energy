@@ -202,12 +202,15 @@ class ShouldIChargeforPriceSpike(baseDecide):
             and self.actuals.scaled_price + self.a.scaled_min_margin
             < (self.a.max_values[0] * 0.9)
             and self.a.battery_at_peak < self.actuals.battery_max_energy
-            and self.actuals.scaled_price
-            # if this is one of the cheapest prices to charge the battery before the price spike..
-            <= max(
-                sorted(self.forecasts.amber_scaled_price[0 : self.a.start_high_prices])[
-                    0 : self.a.charge_blocks_required_for_peak
-                ]
+            and (
+                self.actuals.scaled_price
+                # if this is one of the cheapest prices to charge the battery before the price spike..
+                <= max(
+                    sorted(
+                        self.forecasts.amber_scaled_price[0 : self.a.start_high_prices]
+                    )[0 : self.a.charge_blocks_required_for_peak]
+                )
+                or self.a.charge_blocks_required_for_peak > self.a.start_high_prices
             )
             and self.actuals.battery_pct_level < MAX_BATTERY_LEVEL
         ):
