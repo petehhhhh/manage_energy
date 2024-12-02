@@ -135,49 +135,12 @@ class Should_i_charge_as_not_enough_solar(baseDecide):
         else:
             blocks_to_check = first_no_grid_export
 
-        # find when next higher price is coming...
-        first_higher_price = None
-        for i, num in enumerate(self.forecasts.amber_scaled_price):
-            if num * 0.9 > actuals.scaled_price:
-                first_higher_price = i
-                break
-        # if i have a higher price upcoming that i will need to import for, check whether this is a good time...
-        if (
-            first_higher_price is not None
-            and first_higher_price < blocks_to_check
-            and (
-                first_no_grid_export is None
-                or first_higher_price >= first_no_grid_export
-            )
-        ):
-            blocks_to_check = first_higher_price
-
-        blocks_to_charge = min(blocks_to_check + 1, blocks_to_charge)
-
-        if blocks_to_charge == 0:
+        blocks = self.forecasts.amber_scaled_price[0 : blocks_to_check - 1]
+        if len(blocks) == 0:
             return False
-
-        if blocks_to_check == 0:
-            if actuals.scaled_price < 0.9 * self.forecasts.amber_scaled_price[0]:
-                return True
-        else:
-            blocks = self.forecasts.amber_scaled_price[0 : blocks_to_check - 1]
-            if len(blocks) == 0:
-                return False
-
-            if len(blocks) == 1:
-                val = blocks[0]
-            else:
-                blocks = sorted(blocks)[: blocks_to_charge - 1]
-                if len(blocks) == 1:
-                    val = blocks[0]
-                else:
-                    val = max(blocks)
-
-            if actuals.scaled_price <= val:
-                return True
-
-        # also check whether prices will be higher when we don't have enough power
+        # check whether a better time to charge. Should really work out how many blocks we need mim but on future iterations, should then eliminate export and never hit here. We will see...
+        if self.actuals.scaled_price <= max(sorted(blocks[0:blocks_to_charge])):
+            return True
 
         return False
 
