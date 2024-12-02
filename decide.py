@@ -208,7 +208,7 @@ class ShouldIChargeforPriceSpike(baseDecide):
     """If i have available energy and the actual is as good as it gets in the next five hours (with margin) or there is a price spike in the next 5 hours and this is one of the best opportunities."""
 
     def eval_rule(self):
-        """ "Evaluate rule."""
+        """Evaluate rule."""
 
         if (
             self.a.start_high_prices is not None
