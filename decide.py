@@ -3,6 +3,7 @@ from .const import BATTERY_DISCHARGE_RATE, MAX_BATTERY_LEVEL, PowerSelectOptions
 
 import datetime
 import logging
+import traceback
 from .const import MAX_BATTERY_LEVEL, CURTAIL_BATTERY_LEVEL
 from homeassistant.core import HomeAssistant, StateMachine  # type: ignore
 from homeassistant.components.recorder import get_instance  # type: ignore
@@ -44,8 +45,10 @@ def Decide_Battery_Action(hub, a: Analysis):
                 if rule():
                     break
             except Exception as e:
-                hub.update_status("Rule failed: " + str(e))
-                _LOGGER.error("Rule failed: " + str(e) + "\n" + error_details)
+                tb = traceback.extract_tb(e.__traceback__)
+                function_name = tb[-1].name  # Get the last function in the traceback
+                hub.update_status("Rule failed: " + function_name)
+                _LOGGER.error("Rule failed: " + function_name + "\n" + str(e))
             # will contnue onto next rule
 
 
@@ -69,7 +72,6 @@ class baseDecide:
     def action(self, action: PowerSelectOptions, msg: str) -> None:
         """Execute an action and write a status msg."""
 
-        _LOGGER.info(msg)
         self.hub.set_mode(action)
         self.hub.update_status(msg)
 
@@ -143,7 +145,10 @@ class Should_i_charge_as_not_enough_solar(baseDecide):
         if (
             first_higher_price is not None
             and first_higher_price < blocks_to_check
-            and first_higher_price < first_no_grid_export
+            and (
+                first_no_grid_export is None
+                or first_higher_price < first_no_grid_export
+            )
         ):
             blocks_to_check = first_higher_price
 
