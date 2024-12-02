@@ -139,7 +139,7 @@ class Should_i_charge_as_not_enough_solar(baseDecide):
             blocks_to_check = first_no_grid_export
 
         _LOGGER.error(
-            "Blocks to check  = "
+            "Blocks to check = "
             + str(blocks_to_check)
             + ", blocks to charge = "
             + str(blocks_to_charge)
