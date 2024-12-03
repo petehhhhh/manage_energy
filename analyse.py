@@ -1,4 +1,4 @@
-from .const import BATTERY_DISCHARGE_RATE, MAX_BATTERY_LEVEL
+from .const import BATTERY_DISCHARGE_RATE, MAX_BATTERY_LEVEL, BATTERY_CHARGE_RATE
 
 
 import datetime
@@ -165,7 +165,7 @@ class Analysis:
                         actuals.battery_max_usable_energy
                         - forecasts.battery_energy[self.start_high_prices]
                     )
-                    / BATTERY_DISCHARGE_RATE
+                    / BATTERY_CHARGE_RATE
                     * 2.5  # add buffer to calcs to ensure charged
                 )
                 + 1

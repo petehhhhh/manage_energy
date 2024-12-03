@@ -7,6 +7,7 @@ from enum import StrEnum, IntEnum
 DOMAIN = "manage_energy"
 MIN_MARGIN = 0.2
 BATTERY_DISCHARGE_RATE = 8
+BATTERY_CHARGE_RATE = 7
 CURTAIL_BATTERY_LEVEL = 95
 MAX_BATTERY_LEVEL = 99
 # how much to add to general forecast price for when in demand window.... 30 days at 30 cents for 5 extra kW...

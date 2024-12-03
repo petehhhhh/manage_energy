@@ -4,7 +4,7 @@ from .const import BATTERY_DISCHARGE_RATE, MAX_BATTERY_LEVEL, PowerSelectOptions
 import datetime
 import logging
 import traceback
-from .const import MAX_BATTERY_LEVEL, CURTAIL_BATTERY_LEVEL
+from .const import MAX_BATTERY_LEVEL, BATTERY_CHARGE_RATE
 from homeassistant.core import HomeAssistant, StateMachine  # type: ignore
 from homeassistant.components.recorder import get_instance  # type: ignore
 from homeassistant.components.recorder.history import state_changes_during_period  # type: ignore
@@ -93,7 +93,7 @@ class Should_i_charge_as_not_enough_solar(baseDecide):
                 round(
                     (1 - (actuals.battery_pct_level / 100))
                     * actuals.battery_max_usable_energy
-                    / BATTERY_DISCHARGE_RATE,
+                    / BATTERY_CHARGE_RATE,
                     0,
                 )
             )
@@ -125,7 +125,6 @@ class Should_i_charge_as_not_enough_solar(baseDecide):
             or actuals.battery_pct_level >= MAX_BATTERY_LEVEL
             or is_demand_window(datetime.datetime.now())
         ):
-            _LOGGER.error("No grid imports forecast")
             return False
 
         _LOGGER.error("Firstgridimport = " + str(firstgridimport))
@@ -204,7 +203,7 @@ class ShouldIChargeforPriceSpike(baseDecide):
             and self.a.battery_at_peak < self.actuals.battery_max_energy
             and (
                 self.actuals.scaled_price
-                # if this is one of the cheapest prices to charge the battery before the price spike..
+                # ...and this is the best possible time to charge...
                 <= max(
                     sorted(
                         self.forecasts.amber_scaled_price[0 : self.a.start_high_prices]
