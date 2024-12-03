@@ -48,8 +48,17 @@ def Decide_Battery_Action(hub, a: Analysis):
                 tb = traceback.extract_tb(e.__traceback__)
                 function_name = tb[-1].name  # Get the last function in the traceback
                 hub.update_status("Rule failed: " + function_name)
-                _LOGGER.error("Rule failed: " + function_name + "\n" + str(e))
+                _LOGGER.error("Rule failed: " + function_name + "\n" + tb.format_exc())
             # will contnue onto next rule
+
+
+def largest_entry(block, no_of_entry) -> float:
+    """Returns the max value from block across the three lowest elements in an array"""
+    if len(block) == 0:
+        return None
+    if len(block) == 1 or no_of_entry <= 1:
+        return block[0]
+    return max(sorted(block)[0:no_of_entry])
 
 
 class baseDecide:
@@ -125,6 +134,8 @@ class Should_i_charge_as_not_enough_solar(baseDecide):
             or actuals.battery_pct_level >= MAX_BATTERY_LEVEL
             or is_demand_window(datetime.datetime.now())
         ):
+            _LOGGER.error("Battery charged before first grid import.")
+
             return False
 
         _LOGGER.error("Firstgridimport = " + str(firstgridimport))
@@ -182,6 +193,9 @@ class ShouldIDischarge(baseDecide):
                 self.a.available_max_values is not None
                 and len(self.a.available_max_values) > 0
                 and self.actuals.feedin >= 0.9 * min(self.a.available_max_values)
+                and self.a.has_sufficient_margin(
+                    self.actuals.feedin, min(self.a.next12hours)
+                )
             )
         ):
             return True
@@ -204,10 +218,9 @@ class ShouldIChargeforPriceSpike(baseDecide):
             and (
                 self.actuals.scaled_price
                 # ...and this is the best possible time to charge...
-                <= max(
-                    sorted(
-                        self.forecasts.amber_scaled_price[0 : self.a.start_high_prices]
-                    )[0 : self.a.charge_blocks_required_for_peak]
+                <= largest_entry(
+                    self.forecasts.amber_scaled_price[0 : self.a.start_high_prices],
+                    self.a.charge_blocks_required_for_peak,
                 )
                 or self.a.charge_blocks_required_for_peak > self.a.start_high_prices
             )
