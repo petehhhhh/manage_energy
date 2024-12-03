@@ -38,48 +38,37 @@ class Analysis:
         else:
             self.scaled_min_margin = self._minimum_margin
 
-    def find_index_of_first_entry_that_is_less_than_this(self, value1):
+    def find_index_of_first_entry_that_is_less_than_this(self, value1) -> int:
         """Iterate through next12hours and find the first value after this one that with margin is less than this one."""
 
+        first = None
         for index, value in enumerate(self.next12hours):
             # if this entry is after the start of high prices and it is less than this value less required margin...
             if (self.start_high_prices is None or index > self.start_high_prices) and (
                 self.has_sufficient_margin(value1, value)
             ):
-                self.end_high_prices = index
                 self.insufficient_margin = False
+                first = index
                 break
 
-    def find_start_and_end_high_prices(self):
-        """finds the start of high prices and stores in self.start_high_prices."""
+        return first
 
-        # work out when in next 12 hours we can best use available blocks of discharge
-        self.max_values = sorted(self.next12hours, reverse=True)[
-            : (self.discharge_blocks_available)
-        ]
-
-        # get rid of max values that are less than the minimum margin
-        self.max_values = [
-            x
-            for x in self.max_values
-            if x > (min(self.next12hours) + self._minimum_margin)
-        ]
-
-        # find  when high prices start
-        self.start_high_prices = None
-        for index, value in enumerate(self.next12hours):
-            if value in self.max_values:
-                self.start_high_prices = index
-                break
-
-        # now find the first entry that has the minimum margin to export to grid. Trim the max values to ensure there is sufficient margin
+    def find_end_high_prices(self):
+        """Now find the first entry that has the minimum margin to export to grid. Trim the max values to ensure there is sufficient margin."""
         self.insufficient_margin = True
         self.end_high_prices = None
         last_end_high_prices = None
         for index1, value1 in enumerate(self.max_values):
-            self.end_high_prices = None
-
-            self.find_index_of_first_entry_that_is_less_than_this(value1)
+            self.end_high_prices = (
+                self.find_index_of_first_entry_that_is_less_than_this(value1)
+            )
+            # go for the first one as we can always charge up again if multiple (assume)
+            if (
+                self.end_high_prices is not None
+                and last_end_high_prices is not None
+                and self.end_high_prices > last_end_high_prices
+            ):
+                self.end_high_prices = last_end_high_prices
 
             # exception checks for max_values where max is less than margin
             if index1 == 0 and self.end_high_prices is None:
@@ -93,8 +82,33 @@ class Analysis:
                 self.insufficient_margin = False
                 break
 
-            # this is at the end of the second for loop
             last_end_high_prices = self.end_high_prices  # noqa: F841
+
+    def find_start_and_end_high_prices(self):
+        """Finds the start of high prices and stores in self.start_high_prices."""
+
+        # work out when in next 12 hours we can best use available blocks of discharge
+        self.max_values = sorted(self.next12hours, reverse=True)[
+            : (self.discharge_blocks_available)
+        ]
+
+        # get rid of max values that are less than the minimum margin
+        self.max_values = [
+            x
+            for x in self.max_values
+            if x > (min(self.next12hours) + self._minimum_margin)
+        ]
+        # Find when high prices start
+        self.start_high_prices = next(
+            (
+                index
+                for index, value in enumerate(self.next12hours)
+                if value in self.max_values
+            ),
+            None,
+        )
+
+        self.find_end_high_prices()
 
     def has_sufficient_margin(self, value: float, baseline: float) -> bool:
         """Check if the value has sufficient margin."""
@@ -136,6 +150,13 @@ class Analysis:
         forecasts = self.forecasts
         actuals = self.actuals
         self.next12hours = forecasts.amber_feed_in[0:TTL_FORECAST_BLOCKS]
+        self.blocks_to_charge = int(
+            (
+                self.actuals.battery_max_usable_energy
+                - self.actuals.available_battery_energy
+            )
+            / BATTERY_CHARGE_RATE
+        )
 
         self.discharge_blocks_available = (
             int(round(actuals.battery_max_usable_energy / BATTERY_DISCHARGE_RATE, 0))
