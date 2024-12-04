@@ -30,21 +30,21 @@ SENSORS: dict[str, SensorEntityDescription] = {
     "status": SensorEntityDescription(
         key="manage-energy-status",
         translation_key="status",
-        name="Status",
+        name="Manage Energy Status",
         icon="mdi:gauge-low",
         entity_category=EntityCategory.DIAGNOSTIC,
     ),
     "history": SensorEntityDescription(
         key="manage-energy-history",
         translation_key="history",
-        name="History",
+        name="Manage Energy History",
         icon="mdi:gauge-low",
         entity_category=EntityCategory.DIAGNOSTIC,
     ),
     "forecast": SensorEntityDescription(
         key="manage-energy-forecast",
         translation_key="forecast",
-        name="Forecast",
+        name="Manage Energy Forecast",
         icon="mdi:gauge-low",
         entity_category=EntityCategory.DIAGNOSTIC,
     ),
@@ -84,6 +84,7 @@ class SensorBase(SensorEntity, RestoreEntity):
             ATTR_MANUFACTURER: hub.manufacturer,
             ATTR_MODEL: "Energy Model",
         }
+        self._attr_unique_id = entity_description.key
         self._unique_id = entity_description.key
 
     @property
@@ -110,11 +111,6 @@ class SensorBase(SensorEntity, RestoreEntity):
     def available(self) -> bool:
         """Return True if entity is available."""
         return True
-
-    @property
-    def unique_id(self):
-        """Return the unique ID of the sensor."""
-        return f"me_{self._unique_id}"
 
 
 class StatusBase(SensorBase):
@@ -183,8 +179,14 @@ class HistoryBase(SensorBase, RestoreEntity):
         return self._attr_extra_state_attributes
 
 
-class Forecast(HistoryBase):
+class Forecast(HistoryBase, SensorBase):
     """The current forecast"""
+
+    def __init__(
+        self, entity_description: SensorEntityDescription, config_entry, hub
+    ) -> None:
+        self._unique_id = entity_description.key
+        super().__init__(entity_description, config_entry, hub)
 
     def _on_hub_state_changed(self, new_state):
         """Handle when the hub's state changes."""
