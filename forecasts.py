@@ -104,6 +104,7 @@ class Forecasts:
         self.export = []
         self.forecast_data = None
         self.recorder = get_instance(self._hass)
+        self.forecast = []
 
     def add_listener(self, callback):
         """Add a listener that will be notified when the state changes."""
@@ -170,7 +171,7 @@ class Forecasts:
             if value["start_time"] != None:
                 consumption_yesterday = (
                     await self.get_sensor_state_changes_for_fixed_period(
-                        "sensor.power_consumption",
+                        "sensor.home_load_power",
                         self.format_date(value["start_time"]),
                     )
                 )
@@ -185,7 +186,7 @@ class Forecasts:
                     )
                 )
                 solar_yesterday = await self.get_sensor_state_changes_for_fixed_period(
-                    "sensor.power_solar_generation",
+                    "sensor.home_solar_power",
                     self.format_date(value["start_time"]),
                 )
                 net_consumption = consumption_yesterday - tesla_yesterday
@@ -244,6 +245,29 @@ class Forecasts:
 
         return battery_forecast, export_forecast
 
+    def store_forecast(self):
+        """Store the forecast for use in a sensor."""
+
+        #  history = self._hass.states.get(
+        #     "sensor.manage_energy_history")
+        self.forecast = []
+
+        for i, _ in enumerate(self.start_time):
+            self.forecast.append(
+                {
+                    "start_time": self.start_time[i],
+                    "feed_in": self.amber_feed_in[i],
+                    "price": self.amber_price[i],
+                    "solar": round(self.solar[i], 1),
+                    "consumption": round(self.consumption[i], 1),
+                    "net": round(self.net[i], 1),
+                    "battery": int(
+                        self.battery_energy[i] / self._actuals.battery_max_energy * 100
+                    ),
+                    "export": round(self.export[i], 1),
+                }
+            )
+
     async def store_history(self):
         # store the forecast history and the actuals in a sensor
 
@@ -285,12 +309,12 @@ class Forecasts:
                 break
 
         self.history = history[-24:]
-        self._notify_listeners()
 
     #  self._hass.states.async_set(
     #     "sensor.manage_energy_history", len(history), {"history": history})
 
     async def build(self):
+        """ "Build the foreacst."""
         self.amber_feed_in, self.start_time = self.forecast_amber_feed_in_and_times()
         self.amber_price, self.amber_scaled_price = (
             self.forecast_and_scale_amber_prices()
@@ -305,6 +329,8 @@ class Forecasts:
         self.battery_energy, self.export = self.forecast_battery_and_exports()
 
         await self.store_history()
+        self.store_forecast()
+        self._notify_listeners()
 
     def format_date(self, std1):
         """Converts a date string or datetime to the specified time zone using zoneinfo."""

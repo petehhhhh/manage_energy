@@ -1,4 +1,5 @@
 """Pete's energy integration."""
+
 from __future__ import annotations
 
 from homeassistant.config_entries import ConfigEntry
@@ -12,33 +13,52 @@ PLATFORMS: list[str] = ["select", "switch", "sensor"]
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
-    """Set up Hello World from a config entry."""
-    # Store an instance of the "connecting" class that does the work of speaking
-    # with your actual devices.
-
+    """Set up the integration from a config entry."""
     poll_frequency = entry.options.get(
-        ConfName.POLLING_FREQUENCY, ConfDefaultInt.POLLING_FREQUENCY)
+        ConfName.POLLING_FREQUENCY, ConfDefaultInt.POLLING_FREQUENCY
+    )
     minimum_margin = entry.options.get(
-        ConfName.MINIMUM_MARGIN, ConfDefaultInt.MINIMUM_MARGIN)
-    cheap_price = entry.options.get(
-        ConfName.MINIMUM_MARGIN, ConfDefaultInt.CHEAP_PRICE)
-    # ensure hass.data is a dictionary...
+        ConfName.MINIMUM_MARGIN, ConfDefaultInt.MINIMUM_MARGIN
+    )
+    cheap_price = entry.options.get(ConfName.CHEAP_PRICE, ConfDefaultInt.CHEAP_PRICE)
+
+    # Ensure hass.data is a dictionary
     if DOMAIN not in hass.data:
         hass.data[DOMAIN] = {}
     hub = manage_energy(
-        hass, entry.data["host"], poll_frequency, minimum_margin, cheap_price)
+        hass, entry.data["host"], poll_frequency, minimum_margin, cheap_price
+    )
     hass.data.setdefault(DOMAIN, {})[entry.entry_id] = hub
-    
-    
+
     async def handle_manage_energy_service(call: ServiceCall):
         """Handle the service call."""
         await hub.handle_manage_energy()
 
     # Register the service
-    hass.services.async_register(DOMAIN, 'refresh', handle_manage_energy_service)
+    hass.services.async_register(DOMAIN, "refresh", handle_manage_energy_service)
+
+    # Register a listener to run handle_manage_energy when HA has fully started
+    async def run_on_start(event):
+        """Run handle_manage_energy after Home Assistant starts."""
+        await hub.handle_manage_energy()
+
+    hass.bus.async_listen_once("homeassistant_started", run_on_start)
+
+    # Forward the setup to the platforms
+    await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
+    entry.async_on_unload(entry.add_update_listener(async_reload_entry))
+
+    return True
+
+    async def handle_manage_energy_service(call: ServiceCall):
+        """Handle the service call."""
+        await hub.handle_manage_energy()
+
+    # Register the service
+    hass.services.async_register(DOMAIN, "refresh", handle_manage_energy_service)
     # This creates each HA object for each platform your device requires.
     # It's done by calling the `async_setup_entry` function in each platform module.
-    
+
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     entry.async_on_unload(entry.add_update_listener(async_reload_entry))
     return True
@@ -64,9 +84,13 @@ async def async_reload_entry(hass: HomeAssistant, entry: ConfigEntry) -> None:
     """Handle an options update."""
     # await hass.config_entries.async_reload(entry.entry_id)
     hub = hass.data.setdefault(DOMAIN, {})[entry.entry_id]
-    await hub.update_poll_frequency(entry.options.get(ConfName.POLLING_FREQUENCY, ConfDefaultInt.POLLING_FREQUENCY))
+    await hub.update_poll_frequency(
+        entry.options.get(ConfName.POLLING_FREQUENCY, ConfDefaultInt.POLLING_FREQUENCY)
+    )
 
     hub.minimum_margin = entry.options.get(
-        ConfName.MINIMUM_MARGIN, ConfDefaultInt.MINIMUM_MARGIN)
-    hub.set_cheap_price(entry.options.get(
-        ConfName.CHEAP_PRICE, ConfDefaultInt.CHEAP_PRICE))
+        ConfName.MINIMUM_MARGIN, ConfDefaultInt.MINIMUM_MARGIN
+    )
+    hub.set_cheap_price(
+        entry.options.get(ConfName.CHEAP_PRICE, ConfDefaultInt.CHEAP_PRICE)
+    )

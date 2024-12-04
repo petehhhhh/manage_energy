@@ -30,14 +30,21 @@ SENSORS: dict[str, SensorEntityDescription] = {
     "status": SensorEntityDescription(
         key="manage-energy-status",
         translation_key="status",
-        name="Manage Energy Status",
+        name="Status",
         icon="mdi:gauge-low",
         entity_category=EntityCategory.DIAGNOSTIC,
     ),
     "history": SensorEntityDescription(
         key="manage-energy-history",
         translation_key="history",
-        name="Manage Energy History",
+        name="History",
+        icon="mdi:gauge-low",
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+    "forecast": SensorEntityDescription(
+        key="manage-energy-forecast",
+        translation_key="forecast",
+        name="Forecast",
         icon="mdi:gauge-low",
         entity_category=EntityCategory.DIAGNOSTIC,
     ),
@@ -52,6 +59,7 @@ async def async_setup_entry(hass, config_entry, async_add_entities):
         [
             StatusBase(SENSORS["status"], config_entry, hub),
             HistoryBase(SENSORS["history"], config_entry, hub),
+            Forecast(SENSORS["forecast"], config_entry, hub),
         ]
     )
 
@@ -173,3 +181,32 @@ class HistoryBase(SensorBase, RestoreEntity):
     @property
     def extra_state_attributes(self):
         return self._attr_extra_state_attributes
+
+
+class Forecast(HistoryBase):
+    """The current forecast"""
+
+    def _on_hub_state_changed(self, new_state):
+        """Handle when the hub's state changes."""
+        self._state = str(len(self._hub.forecasts.forecast))
+        self._attributes["state"] = self._state
+        self._attr_extra_state_attributes["forecast"] = self._hub.forecasts.forecast
+
+        self.async_write_ha_state()
+
+    async def async_added_to_hass(self):
+        """Run when entity about to be added to hass."""
+        await super().async_added_to_hass()
+        last_state = await self.async_get_last_state()
+        if last_state is not None:
+            self._state = last_state.state
+
+        self.async_write_ha_state()
+
+    @property
+    def native_value(self) -> str:
+        """Return the state of the entity."""
+        self._state = str(len(self._hub.forecasts.forecast))
+        self._attr_extra_state_attributes["forecast"] = self._hub.forecasts.forecast
+
+        return self._state
