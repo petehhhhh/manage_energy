@@ -134,11 +134,8 @@ class Should_i_charge_as_not_enough_solar(baseDecide):
             or actuals.battery_pct_level >= MAX_BATTERY_LEVEL
             or is_demand_window(datetime.datetime.now())
         ):
-            _LOGGER.error("Battery charged before first grid import.")
-
             return False
 
-        _LOGGER.error("Firstgridimport = " + str(firstgridimport))
         if battery_charged is None or firstgridimport < battery_charged:
             first_no_grid_export = None
             for i, num in enumerate(self.forecasts.export):
@@ -152,15 +149,6 @@ class Should_i_charge_as_not_enough_solar(baseDecide):
             blocks_to_check = FORECAST_WINDOW
         else:
             blocks_to_check = first_no_grid_export
-
-        _LOGGER.error(
-            "Blocks to check = "
-            + str(blocks_to_check)
-            + ", blocks to charge = "
-            + str(blocks_to_charge)
-            + ",Actual scaled price = "
-            + str(self.actuals.scaled_price)
-        )
 
         blocks = self.forecasts.amber_scaled_price[0 : blocks_to_check - 1]
 
