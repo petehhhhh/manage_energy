@@ -140,14 +140,14 @@ class Forecasts:
             for index, value in enumerate(sf_data):
                 if self.compare_datetimes(value["period_start"], self.start_time[0]):
                     solar_forecast = [sf["pv_estimate"] for sf in sf_data[index:]]
-                    tomorrow_rows = len(self.amber_feed_in) - len(solar_forecast)
-                    if tomorrow_rows > 0:
-                        solar_forecast = solar_forecast + [
-                            sf["pv_estimate"]
-                            for sf in self.hub.hass.states.get(
-                                "sensor.solcast_pv_forecast_forecast_tomorrow"
-                            ).attributes["detailedForecast"][0:tomorrow_rows]
-                        ]
+            tomorrow_rows = len(self.amber_feed_in) - len(solar_forecast)
+            if tomorrow_rows > 0:
+                solar_forecast = solar_forecast + [
+                    sf["pv_estimate"]
+                    for sf in self.hub.hass.states.get(
+                        "sensor.solcast_pv_forecast_forecast_tomorrow"
+                    ).attributes["detailedForecast"][0:tomorrow_rows]
+                ]
         return solar_forecast
 
     async def get_yesterday_consumption(self):
