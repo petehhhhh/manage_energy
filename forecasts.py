@@ -264,7 +264,7 @@ class Forecasts:
             if i < len(self.action):
                 action = self.action[i].value
             else:
-                action = None
+                action = ""
 
             self.forecast.append(
                 {
@@ -363,20 +363,22 @@ class Forecasts:
         ff = Forecasts(self.hub)
         ff.actuals = self.actuals
         ff.action.append(None)
-        for i in range(24):  # range(24) generates numbers from 0 to 23
-            self.build_fwd_actuals(ff)
-            self.build_fwd_forecast(ff, i)
-            ff.analysis = Analysis(self, ff.actuals, self.hub)
+        for i in range(
+            len(self.amber_feed_in)
+        ):  # range(24) generates numbers from 0 to 23
+            self.build_fwd_actuals(ff, i)
+            ff = self.build_fwd_forecast(ff, i)
+            ff.analysis = Analysis(ff, ff.actuals, self.hub)
             ff.analysis.analyze_price_peaks()
             d = Decide(ff)
             ff.actuals.action = d.action
             ff.actuals.battery_charge_rate = self.calc_battery_charge_rate(ff.actuals)
 
-            self.update_foreacst(ff, i)
+            self.update_forecast(ff, i)
 
         self.actuals.refresh
 
-    def update_foreacst(self, ff, i):
+    def update_forecast(self, ff, i):
         """ "Capture the actual action and values in original forecast."""
         a: Actuals
         a = self.actuals
@@ -387,7 +389,7 @@ class Forecasts:
         self.battery_energy[i] = a.available_battery_energy
         self.battery_pct[i] = a.battery_pct
 
-    def build_fwd_actuals(self, ff):
+    def build_fwd_actuals(self, ff, i):
         """Build actuals for next forecast in spot 0. Assumes actuals contains last actuals."""
         a: Actuals
         a = self.actuals
@@ -399,10 +401,10 @@ class Forecasts:
             a.battery_charge_rate,
         ) = self.calc_battery_and_net(a.available_battery_energy, a.battery_charge_rate)
 
-        a.scaled_price = self.amber_scaled_price[0]
-        a.feedin = self.amber_feed_in[0]
-        a.solar = self.solar[0]
-        a.consumption = self.consumption[0]
+        a.scaled_price = self.amber_scaled_price[i]
+        a.feedin = self.amber_feed_in[i]
+        a.solar = self.solar[i]
+        a.consumption = self.consumption[i]
         a.grid_energy = a.solar - a.consumption - a.battery_charge_rate
         # self.curtailed = self.hub.curtailment
 
@@ -446,6 +448,7 @@ class Forecasts:
         ff.battery_energy, ff.grid, ff.battery_pct, ff.battery_charge_rate = (
             self.forecast_battery_and_grid(ff)
         )
+        return ff
 
     def format_date(self, std1):
         """Converts a date string or datetime to the specified time zone using zoneinfo."""

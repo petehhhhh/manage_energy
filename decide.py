@@ -233,7 +233,7 @@ class ShouldIChargeforPriceSpike(baseRule):
                 self.actuals.scaled_price
                 # ...and this is the best possible time to charge...
                 <= largest_entry(
-                    self.forecasts.amber_scaled_price[0 : self.a.start_high_prices],
+                    self.forecast.amber_scaled_price[0 : self.a.start_high_prices],
                     self.a.charge_blocks_required_for_peak,
                 )
                 or self.a.charge_blocks_required_for_peak > self.a.start_high_prices
