@@ -261,6 +261,11 @@ class Forecasts:
         self.forecast = []
 
         for i, _ in enumerate(self.start_time):
+            if i < len(self.action):
+                action = self.action[i].value
+            else:
+                action = None
+
             self.forecast.append(
                 {
                     "start_time": self.start_time[i],
@@ -271,8 +276,8 @@ class Forecasts:
                     "net": round(self.net[i], 1),
                     "battery": self.battery_pct[i],
                     "export": round(self.grid[i], 1),
-                    "action": self.action[i],
-                    "battery_charge_rate": self.battery_charge_rate,
+                    "action": action,
+                    "battery_charge_rate": self.battery_charge_rate[i],
                 }
             )
 
