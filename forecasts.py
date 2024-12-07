@@ -269,10 +269,10 @@ class Forecasts:
                     "solar": round(self.solar[i], 1),
                     "consumption": round(self.consumption[i], 1),
                     "net": round(self.net[i], 1),
-                    "battery": int(
-                        self.battery_energy[i] / self.actuals.battery_max_energy * 100
-                    ),
+                    "battery": self.battery_pct[i],
                     "export": round(self.grid[i], 1),
+                    "action": self.action[i],
+                    "battery_charge_rate": self.battery_charge_rate,
                 }
             )
 
@@ -346,9 +346,9 @@ class Forecasts:
         self.actuals.decision = Decide(self).Decide_Battery_Action()
         self.actuals.action = self.actuals.decision.action
         await self.store_history()
-        self.store_forecast()
 
         self.build_charge_forecast()
+        self.store_forecast()
 
         self._notify_listeners()
 
