@@ -53,7 +53,7 @@ class Analysis:
         return first
 
     def find_end_high_prices(self):
-        """Now find the first entry that has the minimum margin to export to grid. Trim the max values to ensure there is sufficient margin."""
+        """Now find the first entry that has the minimum margin to export to grid. Trim the max values to ensure there is sufficient margin.."""
         self.insufficient_margin = True
         self.end_high_prices = None
         last_end_high_prices = None
