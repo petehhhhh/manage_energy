@@ -92,6 +92,7 @@ class Forecasts:
         self.forecast = []
         self.analysis = None
         self.action = []
+        self.rule = []
 
     def add_listener(self, callback):
         """Add a listener that will be notified when the state changes."""
@@ -263,6 +264,7 @@ class Forecasts:
         for i, _ in enumerate(self.start_time):
             if i < len(self.action):
                 action = self.action[i].value
+                rule = self.rule[i].id
             else:
                 action = ""
 
@@ -277,6 +279,7 @@ class Forecasts:
                     "battery": self.battery_pct[i],
                     "export": round(self.grid[i], 1),
                     "action": action,
+                    "rule": rule,
                     "battery_charge_rate": self.battery_charge_rate[i],
                 }
             )
@@ -348,8 +351,8 @@ class Forecasts:
         )
         self.analysis = Analysis(self, actuals, self.hub)
         self.analysis.analyze_price_peaks()
-        self.actuals.decision = Decide(self).Decide_Battery_Action()
-        self.actuals.action = self.actuals.decision.action
+        self.actuals.rule = Decide(self).Decide_Battery_Action()
+        self.actuals.action = self.actuals.rule.action
         await self.store_history()
 
         self.build_charge_forecast()
@@ -358,11 +361,11 @@ class Forecasts:
         self._notify_listeners()
 
     def build_charge_forecast(self):
-        """ "Cycle through forecasts to work through charging decisions for the next x hours."""
+        """ "Cycle through forecasts to work through charging rules for the next x hours."""
 
         ff = Forecasts(self.hub)
         ff.actuals = self.actuals
-        ff.action.append(None)
+
         for i in range(
             len(self.amber_feed_in)
         ):  # range(24) generates numbers from 0 to 23
@@ -370,13 +373,17 @@ class Forecasts:
             ff = self.build_fwd_forecast(ff, i)
             ff.analysis = Analysis(ff, ff.actuals, self.hub)
             ff.analysis.analyze_price_peaks()
-            d = Decide(ff)
-            ff.actuals.action = d.action
+            decision = Decide(ff)
+            ff.actuals.rule = decision.rule
+
+            ff.actuals.action = decision.rule.action
             ff.actuals.battery_charge_rate = self.calc_battery_charge_rate(ff.actuals)
 
             self.update_forecast(ff, i)
 
         self.actuals.refresh
+        self.actuals.rule = Decide(self).Decide_Battery_Action()
+        self.actuals.action = self.actuals.rule.action
 
     def update_forecast(self, ff, i):
         """ "Capture the actual action and values in original forecast."""
@@ -385,6 +392,7 @@ class Forecasts:
 
         self.battery_charge_rate[i] = a.battery_charge_rate
         self.action.append(a.action)
+        self.rule.append(a.rule)
         self.grid[i] = a.grid_energy
         self.battery_energy[i] = a.available_battery_energy
         self.battery_pct[i] = a.battery_pct
@@ -417,7 +425,7 @@ class Forecasts:
         a = prior_actuals
         net_power = a.solar - a.consumption
 
-        match a.action:
+        match a.action.value:
             case PowerSelectOptions.CHARGE:
                 rate = BATTERY_CHARGE_RATE
             case PowerSelectOptions.DISCHARGE:

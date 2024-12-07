@@ -229,7 +229,7 @@ class manage_energy:
             # Now we can now make a decision if we start to feed in...
 
             if self._auto:
-                self.forecasts.actuals.decision.run()
+                self.forecasts.actuals.rule.run()
                 if (
                     #                  not self.tesla_charging
                     self.forecasts.actuals.battery_pct >= CURTAIL_BATTERY_LEVEL

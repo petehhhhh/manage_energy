@@ -38,20 +38,23 @@ class Decide:
 
         self.rules = [
             lambda: ShouldIDischarge(
-                f, PowerSelectOptions.DISCHARGE, "Discharging into Price Spike"
+                f, 1, PowerSelectOptions.DISCHARGE, "Discharging into Price Spike"
             ),
             lambda: Should_i_charge_as_not_enough_solar(
-                f, PowerSelectOptions.CHARGE, "Charging as cheaper now"
+                f, 2, PowerSelectOptions.CHARGE, "Charging as cheaper now"
             ),
             lambda: ShouldIChargeforPriceSpike(
                 f,
+                3,
                 PowerSelectOptions.CHARGE,
                 "Charging for price spike at " + f.analysis.peak_start_str,
             ),
             # lambda: PreserveWhileTeslaCharging(
             #    f, PowerSelectOptions.OFF, "Preserving charge"
             # ),
-            lambda: MaximiseUsage(f, PowerSelectOptions.MAXIMISE, "Maximising usage"),
+            lambda: MaximiseUsage(
+                f, 4, PowerSelectOptions.MAXIMISE, "Maximising usage"
+            ),
         ]
         # and will run one by one, stopping when the first is successful. The last maximise usage should always be successful.
         for i, rule in enumerate(self.rules):
@@ -88,7 +91,7 @@ class Decide:
 class baseRule:
     "Decide on action and execute."
 
-    def __init__(self, forecast, cmd: PowerSelectOptions, msg: str) -> None:
+    def __init__(self, forecast, id, cmd: PowerSelectOptions, msg: str) -> None:
         """Pass analysis include actuals and forecasts on which to decide."""
         self.a = forecast.analysis
         self.hub = forecast.hub
@@ -96,6 +99,7 @@ class baseRule:
         self.actuals = forecast.actuals
         self._cmd = cmd
         self._msg = msg
+        self.id = id
 
     def run(self):
         self.hub.set_mode(self._cmd)
