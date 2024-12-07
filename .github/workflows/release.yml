@@ -19,7 +19,7 @@ jobs:
         id: version
         run: |
           # Extract the current version from hacs.json
-          CURRENT_VERSION=$(jq -r '.version' hacs.json)
+          CURRENT_VERSION=$(jq -r '.version // empty' hacs.json)
           echo "Current Version: $CURRENT_VERSION"
 
           # If no version is found, start at 1.0.0
@@ -29,6 +29,10 @@ jobs:
 
           # Increment the patch version
           IFS='.' read -r MAJOR MINOR PATCH <<< "$CURRENT_VERSION"
+          if [[ -z "$PATCH" ]]; then
+            echo "Error: Could not parse version from hacs.json."
+            exit 1
+          fi
           NEW_VERSION="$MAJOR.$MINOR.$((PATCH + 1))"
           echo "New Version: $NEW_VERSION"
 
@@ -36,12 +40,15 @@ jobs:
           echo "new_version=$NEW_VERSION" >> $GITHUB_ENV
 
       - name: Debug Version
-        run: echo "New Version:${{ env.new_version }}"
+        run: echo "New Version:$NEW_VERSION"
+        env:
+          NEW_VERSION: ${{ env.new_version }}
+
       - name: Update hacs.json and manifest.json
         run: |
           # Update hacs.json and manifest.json with the new version
-          jq ".version = \"$NEW_VERSION\"" hacs.json > tmp_hacs.json && mv tmp_hacs.json hacs.json
-          jq ".version = \"$NEW_VERSION\"" manifest.json > tmp_manifest.json && mv tmp_manifest.json manifest.json
+          jq ".version = \"${{ env.new_version }}\"" hacs.json > tmp_hacs.json && mv tmp_hacs.json hacs.json
+          jq ".version = \"${{ env.new_version }}\"" manifest.json > tmp_manifest.json && mv tmp_manifest.json manifest.json
 
           # Stage changes for commit
           git add hacs.json manifest.json
@@ -49,40 +56,4 @@ jobs:
           # Commit the version bump
           git config --local user.name "GitHub Actions"
           git config --local user.email "actions@github.com"
-          git commit -m "Auto-bump version to v$NEW_VERSION" || echo "No changes to commit"
-        env: # <-- Correct alignment
-          NEW_VERSION: ${{ env.new_version }}
-
-      - name: Push Changes
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          # Push the changes to the repository
-          git push origin main || echo "No changes to push"
-
-      - name: Create or Force Push Tag
-        env:
-          NEW_VERSION: ${{ env.new_version }}
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          # Fetch all remote tags to ensure local knowledge of existing tags
-          git fetch --tags
-
-          # Check if the tag exists in the remote
-          if git ls-remote --tags origin | grep -q "refs/tags/v$NEW_VERSION"; then
-            echo "Tag v$NEW_VERSION already exists. Forcing update."
-            git tag -d "v$NEW_VERSION" || echo "Tag v$NEW_VERSION does not exist locally."
-            git push origin :refs/tags/v$NEW_VERSION || echo "Tag v$NEW_VERSION could not be deleted remotely."
-          fi
-
-          # Create and push the new tag
-          git tag -a "v$NEW_VERSION" -m "Version v$NEW_VERSION"
-          git push origin "v$NEW_VERSION"
-          
-      - name: Create Release
-        uses: ncipollo/release-action@v1
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          tag: "v${{ env.new_version }}"
-          name: "v${{ env.new_version }}"
-          body: "Auto-generated release for version v${{ env.new_version }}"
+          git commit -m "Auto-bump version to v${{ env.new_version }}" || echo "No changes to commit"
