@@ -6,13 +6,12 @@ from homeassistant.core import HomeAssistant, StateMachine  # type: ignore
 from homeassistant.components.recorder import get_instance  # type: ignore
 from homeassistant.components.recorder.history import state_changes_during_period  # type: ignore
 from homeassistant.helpers.event import async_track_time_interval, async_call_later  # type: ignore
-from .forecasts import Forecasts, Actuals, is_demand_window
 
 
 class Analysis:
     """ "Analysis of passed forecasts and actuals."""
 
-    def __init__(self, forecasts: Forecasts, actuals: Actuals, hub) -> None:
+    def __init__(self, forecasts, actuals, hub) -> None:
         """Initiatise Analysis."""
         self.forecasts = forecasts
         self.actuals = actuals
@@ -149,7 +148,8 @@ class Analysis:
         TTL_FORECAST_BLOCKS = 24
         forecasts = self.forecasts
         actuals = self.actuals
-        self.next12hours = forecasts.amber_feed_in[0:TTL_FORECAST_BLOCKS]
+        forecast_window = min(TTL_FORECAST_BLOCKS, len(forecasts.amber_feed_in))
+        self.next12hours = forecasts.amber_feed_in[0:forecast_window]
         self.blocks_to_charge = int(
             (
                 self.actuals.battery_max_usable_energy

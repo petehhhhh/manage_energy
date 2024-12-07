@@ -1,5 +1,6 @@
 from .const import (
     BATTERY_DISCHARGE_RATE,
+    BATTERY_CHARGE_RATE,
     CURTAIL_BATTERY_LEVEL,
     DOMAIN,
     PowerSelectOptions,
@@ -9,6 +10,7 @@ from .const import (
 import time
 import logging
 import traceback
+import copy
 
 from zoneinfo import ZoneInfo
 
@@ -17,41 +19,23 @@ from homeassistant.components.recorder import get_instance
 from homeassistant.components.recorder.history import state_changes_during_period
 from homeassistant.helpers.event import async_track_time_interval, async_call_later
 from datetime import datetime, time, date, timedelta
+from .analyse import Analysis
+from .decide import Decide
+from .utils import is_demand_window, scale_price_for_demand_window
 
 _LOGGER = logging.getLogger(__name__)
 
 
-def is_demand_window(t: datetime):
-    """Is the passed datetime wihtin the demand window."""
-    # Define peak period months: June to August and November to March
-    peak_months = list(range(6, 9)) + [11, 12, 1, 2, 3]
-
-    start_time = time(15, 0, 0)
-    end_time = time(21, 0, 0)
-
-    if t.month in peak_months and (start_time <= t.time() <= end_time):
-        return True
-
-    return False
-
-
-def scale_price_for_demand_window(vtime, val) -> bool:
-    if is_demand_window(vtime):
-        return val + DEMAND_SCALE_UP
-    else:
-        return val
-
-
 class Actuals:
     def __init__(self, hub) -> None:
-        self._hass = hub.hass
-        self._hub = hub
+        self.hub = hub
 
     def refresh(self):
+        """Refresh actuals from meters."""
         self.price = self.get_entity_state("sensor.amber_general_price")
         self.scaled_price = scale_price_for_demand_window(datetime.now(), self.price)
         self.feedin = self.get_entity_state("sensor.amber_feed_in_price")
-        self.battery_pct_level = self.get_entity_state("sensor.home_charge")
+        self.battery_pct = self.get_entity_state("sensor.home_charge")
         self.battery_max_energy = self.get_entity_state(
             "sensor.battery1_battery_capacity"
         ) + self.get_entity_state("sensor.battery2_battery_capacity")
@@ -62,13 +46,13 @@ class Actuals:
         self.solar = self.get_entity_state("sensor.home_solar_power")
         self.battery_charge_rate = self.get_entity_state("sensor.home_load_import") * -1
         self.consumption = self.get_entity_state("sensor.home_site_power")
-        self.curtailed = self._hub.curtailment
-        self.excess_energy = self.solar - self.consumption - self.battery_charge_rate
+        self.curtailed = self.hub.curtailment
+        self.grid_energy = self.solar - self.consumption - self.battery_charge_rate
         if self.curtailed:
-            self.excess_energy += self.solar
+            self.grid_energy += self.solar
 
         self.available_battery_energy = (
-            self.battery_max_energy * self.battery_pct_level / 100
+            self.battery_max_energy * self.battery_pct / 100
         ) - (self.battery_max_energy - self.battery_max_usable_energy)
         self.battery_min_energy = (
             self.battery_max_energy - self.battery_max_usable_energy
@@ -77,7 +61,7 @@ class Actuals:
     def get_entity_state(self, entity_id, attribute=None):
         # get the current value of an entity or its attribute
 
-        val = self._hass.states.get(entity_id)
+        val = self.hub.hass.states.get(entity_id)
         val = val.state
         if val is None or val == "unavailable":
             raise RuntimeError("Entity Unavailable:" + entity_id)
@@ -89,8 +73,8 @@ class Actuals:
 
 class Forecasts:
     def __init__(self, hub) -> None:
-        self._hass = hub.hass
-        self._actuals = hub.actuals
+        self.hub = hub
+        self.actuals = Actuals(hub)
         self._listeners = []
         self.history = []
         self.amber_feed_in = []
@@ -101,10 +85,13 @@ class Forecasts:
         self.consumption = []
         self.net = []
         self.battery_energy = []
-        self.export = []
+        self.battery_charge_rate = []
+        self.grid = []
         self.forecast_data = None
-        self.recorder = get_instance(self._hass)
+        self.recorder = get_instance(self.hub.hass)
         self.forecast = []
+        self.analysis = None
+        self.action = []
 
     def add_listener(self, callback):
         """Add a listener that will be notified when the state changes."""
@@ -116,7 +103,7 @@ class Forecasts:
             callback(self.history)
 
     def forecast_and_scale_amber_prices(self):
-        self.forecast_data = self._hass.states.get("sensor.amber_general_forecast")
+        self.forecast_data = self.hub.hass.states.get("sensor.amber_general_forecast")
         forecast = [f["per_kwh"] for f in self.forecast_data.attributes["forecasts"]]
         # Iterate over self.times and adjust the forecast
         scale_forecast = forecast.copy()
@@ -127,7 +114,7 @@ class Forecasts:
 
     def forecast_amber_feed_in_and_times(self):
         # Retrieve forecast data from the sensor
-        self.forecast_data = self._hass.states.get("sensor.amber_feed_in_forecast")
+        self.forecast_data = self.hub.hass.states.get("sensor.amber_feed_in_forecast")
 
         # Extract forecast prices
         forecast = [f["per_kwh"] for f in self.forecast_data.attributes["forecasts"]]
@@ -143,7 +130,7 @@ class Forecasts:
     def forecast_solar(self):
         # line up solar_forecast start time with that of the amber forecast...
         solar_forecast = []
-        sfd = self._hass.states.get("sensor.solcast_pv_forecast_forecast_today")
+        sfd = self.hub.hass.states.get("sensor.solcast_pv_forecast_forecast_today")
         if (
             sfd is not None
             and sfd.attributes is not None
@@ -157,14 +144,14 @@ class Forecasts:
                     if tomorrow_rows > 0:
                         solar_forecast = solar_forecast + [
                             sf["pv_estimate"]
-                            for sf in self._hass.states.get(
+                            for sf in self.hub.hass.states.get(
                                 "sensor.solcast_pv_forecast_forecast_tomorrow"
                             ).attributes["detailedForecast"][0:tomorrow_rows]
                         ]
         return solar_forecast
 
     async def get_yesterday_consumption(self):
-        # Forecast consumption based on yesterday by querying stats database. create a new list with the consumption from yesterday matching the start time of forecast_data
+        """Forecast consumption based on yesterday by querying stats database. create a new list with the consumption from yesterday matching the start time of forecast_data."""
         consumption = []
         solar = []
         for value in self.forecast_data.attributes["forecasts"]:
@@ -190,65 +177,86 @@ class Forecasts:
                     self.format_date(value["start_time"]),
                 )
                 net_consumption = consumption_yesterday - tesla_yesterday
-                # consumption can be negative if we pick up a spike in tesla so limit to being 0.7 KW - roughly minimum house consumption
-                if net_consumption < 0.7:
-                    net_consumption = 0.7
+                # consumption can be negative if we pick up a spike in tesla so limit to being 0.5 KW - roughly minimum house consumption
+                net_consumption = max(net_consumption, 0.5)
                 consumption.append(net_consumption)
                 solar.append(solar_yesterday)
 
         return consumption, solar
 
-    def forecast_battery_and_exports(self):
+    def calc_battery_percent(self, battery_energy_level: float) -> float:
+        return battery_energy_level / self.actuals.battery_max_energy
+
+    def forecast_battery_and_grid(self, f):
         # current energy in battery is the level of the battery less the unusable energy circa 10%
 
-        battery_energy_level = self._actuals.available_battery_energy
+        battery_energy_level = f.actuals.available_battery_energy
         battery_forecast = []
-        export_forecast = []
-        for forecast_net_energy in self.net:
+        grid_forecast = []
+        pct_forecast = []
+        battery_charge_rate_forecast = []
+        for forecast_net_energy in f.net:
             # assume battery is charged at 5kw and discharged at 5kw and calc based on net energy upto 5kw for a half hour period ie KWH = KW/2
-            battery_pct_level = battery_energy_level / self._actuals.battery_max_energy
-            if battery_pct_level >= 1 and forecast_net_energy > 0:
-                max_rate = 0
-
-            elif (
-                battery_pct_level > 0.9 * self._actuals.battery_max_energy
-                and forecast_net_energy > 1
-            ):
-                # if battery is charging and over 90% then assume charging current = 1kw
-                max_rate = 5
-            elif forecast_net_energy > BATTERY_DISCHARGE_RATE:
-                max_rate = BATTERY_DISCHARGE_RATE
-
-            elif (
-                battery_pct_level
-                <= (self._actuals.battery_min_energy / self._actuals.battery_max_energy)
-                and forecast_net_energy < 0
-            ):
-                max_rate = 0
-
-            elif forecast_net_energy < -1 * BATTERY_DISCHARGE_RATE:
-                max_rate = -1 * BATTERY_DISCHARGE_RATE
-
-            else:
-                max_rate = forecast_net_energy
-
-            battery_energy_level = battery_energy_level + max_rate / 2
-
-            # make sure battery never exeeds max or min
-            if battery_energy_level > self._actuals.battery_max_energy:
-                battery_energy_level = self._actuals.battery_max_energy
-            elif battery_energy_level < self._actuals.battery_min_energy:
-                battery_energy_level = self._actuals.battery_min_energy
+            battery_energy_level, net, battery_pct, battery_charge_rate = (
+                self.calc_battery_and_net(battery_energy_level, forecast_net_energy)
+            )
 
             battery_forecast.append(battery_energy_level)
-            export_forecast.append(forecast_net_energy - max_rate)
+            grid_forecast.append(net)
+            pct_forecast.append(battery_pct)
+            battery_charge_rate_forecast.append(battery_charge_rate)
 
-        return battery_forecast, export_forecast
+        return (
+            battery_forecast,
+            grid_forecast,
+            pct_forecast,
+            battery_charge_rate_forecast,
+        )
+
+    def calc_battery_and_net(self, battery_energy_level: float, net_energy: float):
+        # assume battery is charged at 5kw and discharged at 5kw and calc based on net energy upto 5kw for a half hour period ie KWH = KW/2
+        battery_pct = self.calc_battery_percent(battery_energy_level)
+        if battery_pct >= 1 and net_energy > 0:
+            battery_charge_rate = 0
+
+        elif battery_pct > 0.9 * self.actuals.battery_max_energy and net_energy > 1:
+            # if battery is charging and over 90% then assume charging current = 1kw
+            battery_charge_rate = 5
+        elif net_energy > BATTERY_DISCHARGE_RATE:
+            battery_charge_rate = BATTERY_DISCHARGE_RATE
+
+        elif (
+            battery_pct
+            <= (self.actuals.battery_min_energy / self.actuals.battery_max_energy)
+            and net_energy < 0
+        ):
+            battery_charge_rate = 0
+
+        elif net_energy < -1 * BATTERY_DISCHARGE_RATE:
+            battery_charge_rate = -1 * BATTERY_DISCHARGE_RATE
+
+        else:
+            battery_charge_rate = net_energy
+
+        battery_energy_level = battery_energy_level + battery_charge_rate / 2
+
+        # make sure battery never exeeds max or min
+        if battery_energy_level > self.actuals.battery_max_energy:
+            battery_energy_level = self.actuals.battery_max_energy
+        elif battery_energy_level < self.actuals.battery_min_energy:
+            battery_energy_level = self.actuals.battery_min_energy
+
+        return (
+            battery_energy_level,
+            (net_energy - battery_charge_rate),
+            int(battery_pct * 100),
+            battery_charge_rate,
+        )
 
     def store_forecast(self):
         """Store the forecast for use in a sensor."""
 
-        #  history = self._hass.states.get(
+        #  history = self.hub.hass.states.get(
         #     "sensor.manage_energy_history")
         self.forecast = []
 
@@ -262,16 +270,16 @@ class Forecasts:
                     "consumption": round(self.consumption[i], 1),
                     "net": round(self.net[i], 1),
                     "battery": int(
-                        self.battery_energy[i] / self._actuals.battery_max_energy * 100
+                        self.battery_energy[i] / self.actuals.battery_max_energy * 100
                     ),
-                    "export": round(self.export[i], 1),
+                    "export": round(self.grid[i], 1),
                 }
             )
 
     async def store_history(self):
         # store the forecast history and the actuals in a sensor
 
-        #  history = self._hass.states.get(
+        #  history = self.hub.hass.states.get(
         #     "sensor.manage_energy_history")
         history = self.history
 
@@ -289,9 +297,9 @@ class Forecasts:
                 "consumption": self.consumption[6],
                 "net": self.net[6],
                 "battery": int(
-                    self.battery_energy[6] / self._actuals.battery_max_energy * 100
+                    self.battery_energy[6] / self.actuals.battery_max_energy * 100
                 ),
-                "export": self.export[6],
+                "export": self.grid[6],
             }
         )
         # search for start_time in history and store actuals for that time - effectively stores the actuals versus forecast generated 3 hours ago
@@ -299,22 +307,26 @@ class Forecasts:
             if self.compare_datetimes(value["start_time"], self.start_time[0]):
                 history[index].update(
                     {
-                        "actual_consumption": self._actuals.consumption,
-                        "actual_solar": self._actuals.solar,
-                        "actual_battery": self._actuals.battery_pct_level,
-                        "actual_export": self._actuals.feedin,
-                        "actual_net": self._actuals.consumption - self._actuals.solar,
+                        "actual_consumption": self.actuals.consumption,
+                        "actual_solar": self.actuals.solar,
+                        "actual_battery": self.actuals.battery_pct,
+                        "actual_export": self.actuals.feedin,
+                        "actual_net": self.actuals.consumption - self.actuals.solar,
                     }
                 )
                 break
 
         self.history = history[-24:]
 
-    #  self._hass.states.async_set(
+    #  self.hub.hass.states.async_set(
     #     "sensor.manage_energy_history", len(history), {"history": history})
 
     async def build(self):
         """ "Build the foreacst."""
+
+        self.actuals.refresh()
+        actuals = self.actuals
+
         self.amber_feed_in, self.start_time = self.forecast_amber_feed_in_and_times()
         self.amber_price, self.amber_scaled_price = (
             self.forecast_and_scale_amber_prices()
@@ -326,11 +338,109 @@ class Forecasts:
         else:
             self.solar = solar_forecast
         self.net = [s - c for s, c in zip(self.solar, self.consumption)]
-        self.battery_energy, self.export = self.forecast_battery_and_exports()
-
+        self.battery_energy, self.grid, self.battery_pct, self.battery_charge_rate = (
+            self.forecast_battery_and_grid(self)
+        )
+        self.analysis = Analysis(self, actuals, self.hub)
+        self.analysis.analyze_price_peaks()
+        self.actuals.decision = Decide(self).Decide_Battery_Action()
+        self.actuals.action = self.actuals.decision.action
         await self.store_history()
         self.store_forecast()
+
+        self.build_charge_forecast()
+
         self._notify_listeners()
+
+    def build_charge_forecast(self):
+        """ "Cycle through forecasts to work through charging decisions for the next x hours."""
+
+        ff = Forecasts(self.hub)
+        ff.actuals = self.actuals
+        ff.action.append(None)
+        for i in range(24):  # range(24) generates numbers from 0 to 23
+            self.build_fwd_actuals(ff)
+            self.build_fwd_forecast(ff, i)
+            ff.analysis = Analysis(self, ff.actuals, self.hub)
+            ff.analysis.analyze_price_peaks()
+            d = Decide(ff)
+            ff.actuals.action = d.action
+            ff.actuals.battery_charge_rate = self.calc_battery_charge_rate(ff.actuals)
+
+            self.update_foreacst(ff, i)
+
+        self.actuals.refresh
+
+    def update_foreacst(self, ff, i):
+        """ "Capture the actual action and values in original forecast."""
+        a: Actuals
+        a = self.actuals
+
+        self.battery_charge_rate[i] = a.battery_charge_rate
+        self.action.append(a.action)
+        self.grid[i] = a.grid_energy
+        self.battery_energy[i] = a.available_battery_energy
+        self.battery_pct[i] = a.battery_pct
+
+    def build_fwd_actuals(self, ff):
+        """Build actuals for next forecast in spot 0. Assumes actuals contains last actuals."""
+        a: Actuals
+        a = self.actuals
+
+        (
+            a.available_battery_energy,
+            a.grid_energy,
+            a.battery_pct,
+            a.battery_charge_rate,
+        ) = self.calc_battery_and_net(a.available_battery_energy, a.battery_charge_rate)
+
+        a.scaled_price = self.amber_scaled_price[0]
+        a.feedin = self.amber_feed_in[0]
+        a.solar = self.solar[0]
+        a.consumption = self.consumption[0]
+        a.grid_energy = a.solar - a.consumption - a.battery_charge_rate
+        # self.curtailed = self.hub.curtailment
+
+        # if self.curtailed:
+        #    self.excess_energy += self.solar
+
+    def calc_battery_charge_rate(self, prior_actuals):
+        """Calculates the battery charge rate based on action and accounting for battery max and min"""
+        a: Actuals
+        a = prior_actuals
+        net_power = a.solar - a.consumption
+
+        match a.action:
+            case PowerSelectOptions.CHARGE:
+                rate = BATTERY_CHARGE_RATE
+            case PowerSelectOptions.DISCHARGE:
+                rate = BATTERY_DISCHARGE_RATE * -1
+            case PowerSelectOptions.MAXIMISE:
+                rate = net_power
+            case PowerSelectOptions.OFF:
+                if a.available_battery_energy > a.battery_max_energy:
+                    rate = max(0, net_power)
+
+        if (rate < 0 and a.available_battery_energy < a.battery_min_energy) or (
+            rate > 0 and a.available_battery_energy > a.battery_max_energy
+        ):
+            rate = 0
+
+        return rate
+
+    def build_fwd_forecast(self, ff, i):
+        """Shift forecasts one space to the left to enable eval of rules on next block."""
+
+        ff.amber_feed_in = self.amber_feed_in[i:]
+        ff.amber_scaled_price = self.amber_scaled_price[i:]
+        ff.amber_price = self.amber_price[i:]
+        ff.start_time = self.start_time[i:]
+        ff.solar = self.solar[i:]
+        ff.net = self.net[i:]
+        ff.consumption = ff.consumption[i:]
+        ff.battery_energy, ff.grid, ff.battery_pct, ff.battery_charge_rate = (
+            self.forecast_battery_and_grid(ff)
+        )
 
     def format_date(self, std1):
         """Converts a date string or datetime to the specified time zone using zoneinfo."""
@@ -362,7 +472,7 @@ class Forecasts:
     def get_entity_state(self, entity_id, attribute=None):
         # get the current value of an entity or its attribute
 
-        val = self._hass.states.get(entity_id).state
+        val = self.hub.hass.states.get(entity_id).state
 
         if val is None or val == "unavailable":
             raise RuntimeError("Solaredge unavailable")
@@ -388,7 +498,7 @@ class Forecasts:
         # Retrieve state changes for the sensor during the specified time period
 
         changes = await self.recorder.async_add_executor_job(
-            state_changes_during_period, self._hass, start_time, end_time, entity_id
+            state_changes_during_period, self.hub.hass, start_time, end_time, entity_id
         )
         vals = []
         avg = 0

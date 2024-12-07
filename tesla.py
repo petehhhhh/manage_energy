@@ -7,8 +7,7 @@ from .const import (
 )
 import logging
 import traceback
-import datetime
-import asyncio
+
 from pytz import timezone
 from homeassistant.core import HomeAssistant, StateMachine
 from homeassistant.components.recorder import get_instance
@@ -24,7 +23,7 @@ class TeslaCharging:
     def __init__(self, hub):
         self._hass = hub.hass
         self._hub = hub
-        self.actuals = hub.actuals
+        self.actuals = hub.forecasts.actuals
 
     async def set_tesla_mode(self, mode):
         self._tesla_mode = mode

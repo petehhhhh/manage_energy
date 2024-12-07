@@ -10,14 +10,13 @@ from .const import (
 import logging
 import datetime
 import traceback
-from .decide import Decide_Battery_Action
+
 from homeassistant.core import HomeAssistant, StateMachine  # type: ignore
 from homeassistant.components.recorder import get_instance  # type: ignore
 from homeassistant.components.recorder.history import state_changes_during_period  # type: ignore
 from homeassistant.helpers.event import async_track_time_interval, async_call_later  # type: ignore
-from .forecasts import Forecasts, Actuals, is_demand_window
+from .forecasts import Forecasts, is_demand_window
 from .tesla import TeslaCharging
-from .analyse import Analysis
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -64,7 +63,6 @@ class manage_energy:
             self.refresh_interval,
             datetime.timedelta(seconds=self._poll_frequency),
         )
-        self.actuals = Actuals(self)
         self.forecasts = Forecasts(self)
 
     def set_cheap_price(self, value):
@@ -222,28 +220,20 @@ class manage_energy:
             self.clear_status()
             self.update_status("Runnning manage energy...")
 
-            self.actuals.refresh()
-            actuals = self.actuals
-
-            forecasts = self.forecasts
-            await forecasts.build()
-
-            a = Analysis(forecasts, actuals, self)
-            a.analyze_price_peaks()
+            await self.forecasts.build()
 
             self.clear_status()
             tesla = TeslaCharging(self)
 
-            self.tesla_charging = await tesla.tesla_charging(forecasts)
+            self.tesla_charging = await tesla.tesla_charging(self.forecasts)
             # Now we can now make a decision if we start to feed in...
 
             if self._auto:
-                Decide_Battery_Action(self, a)
-
+                self.forecasts.actuals.decision.run()
                 if (
-                    not self.tesla_charging
-                    and self.actuals.battery_pct_level >= CURTAIL_BATTERY_LEVEL
-                    and self.actuals.feedin < 0
+                    #                  not self.tesla_charging
+                    self.forecasts.actuals.battery_pct >= CURTAIL_BATTERY_LEVEL
+                    and self.forecasts.actuals.feedin < 0
                 ):
                     await self.curtail_solar()
                     self.update_status("Curtailing solar")

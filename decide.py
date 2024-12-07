@@ -9,47 +9,9 @@ from homeassistant.core import HomeAssistant, StateMachine  # type: ignore
 from homeassistant.components.recorder import get_instance  # type: ignore
 from homeassistant.components.recorder.history import state_changes_during_period  # type: ignore
 from homeassistant.helpers.event import async_track_time_interval, async_call_later  # type: ignore
-from .forecasts import Forecasts, Actuals, is_demand_window
-from .analyse import Analysis
+from .utils import is_demand_window
 
 _LOGGER = logging.getLogger(__name__)
-
-
-def Decide_Battery_Action(hub, a: Analysis):
-    """Run rules to decide what action to take with battery."""
-
-    # lambda functions allow to load into an array of rules. Rules are defined in decide.py
-
-    if hub.get_auto():
-        rules = [
-            lambda: ShouldIDischarge(a).run(
-                PowerSelectOptions.DISCHARGE, "Discharging into Price Spike"
-            ),
-            lambda: Should_i_charge_as_not_enough_solar(a).run(
-                PowerSelectOptions.CHARGE, "Charging as cheaper now."
-            ),
-            lambda: ShouldIChargeforPriceSpike(a).run(
-                PowerSelectOptions.CHARGE,
-                "Charging for price spike at " + a.peak_start_str,
-            ),
-            lambda: PreserveWhileTeslaCharging(a).run(
-                PowerSelectOptions.OFF, "Preserving charge"
-            ),
-            lambda: MaximiseUsage(a).run(
-                PowerSelectOptions.MAXIMISE, "Maximising usage"
-            ),
-        ]
-        # and will run one by one, stopping when the first is successful. The last maximise usage should always be successful.
-        for rule in rules:
-            try:
-                if rule():
-                    break
-            except Exception as e:
-                tb = traceback.extract_tb(e.__traceback__)
-                function_name = tb[-1].name  # Get the last function in the traceback
-                hub.update_status("Rule failed: " + function_name)
-                _LOGGER.error("Rule failed: " + function_name + "\n" + tb.format_exc())
-            # will contnue onto next rule
 
 
 def largest_entry(block, no_of_entry) -> float:
@@ -61,38 +23,102 @@ def largest_entry(block, no_of_entry) -> float:
     return max(sorted(block)[0:no_of_entry])
 
 
-class baseDecide:
+class Decide:
+    def __init__(self, f):
+        self.forecast = f
+        self.rules = []
+        self.rule_no = None
+        self.rule = None
+        self.Decide_Battery_Action()
+
+    def Decide_Battery_Action(self):
+        """Run rules to decide what action to take with battery."""
+        f = self.forecast
+        # lambda functions allow to load into an array of rules. Rules are defined in decide.py
+
+        self.rules = [
+            lambda: ShouldIDischarge(
+                f, PowerSelectOptions.DISCHARGE, "Discharging into Price Spike"
+            ),
+            lambda: Should_i_charge_as_not_enough_solar(
+                f, PowerSelectOptions.CHARGE, "Charging as cheaper now"
+            ),
+            lambda: ShouldIChargeforPriceSpike(
+                f,
+                PowerSelectOptions.CHARGE,
+                "Charging for price spike at " + f.analysis.peak_start_str,
+            ),
+            # lambda: PreserveWhileTeslaCharging(
+            #    f, PowerSelectOptions.OFF, "Preserving charge"
+            # ),
+            lambda: MaximiseUsage(f, PowerSelectOptions.MAXIMISE, "Maximising usage"),
+        ]
+        # and will run one by one, stopping when the first is successful. The last maximise usage should always be successful.
+        for i, rule in enumerate(self.rules):
+            try:
+                r = rule()
+                if r.eval():
+                    self.action = r.action
+                    self.rule_no = i
+                    self.rule = r
+                    break
+
+            except Exception as e:
+                # Extract the traceback
+                tb = traceback.extract_tb(e.__traceback__)
+
+                # Get the last entry in the traceback (where the exception occurred)
+                if tb:
+                    last_trace = tb[-1]
+                    function_name = last_trace.name
+                    line_number = last_trace.lineno
+                else:
+                    function_name = "Unknown"
+                    line_number = "Unknown"
+
+                # Build the error message
+                error_message = f"Rule failed: {function_name} at line {line_number}. Error: {str(e)}"
+
+                # Log the error
+                _LOGGER.error(error_message)
+
+        return self.rule
+
+
+class baseRule:
     "Decide on action and execute."
 
-    def __init__(self, a: Analysis) -> None:
+    def __init__(self, forecast, cmd: PowerSelectOptions, msg: str) -> None:
         """Pass analysis include actuals and forecasts on which to decide."""
-        self.a = a
-        self.hub = a.hub
-        self.forecasts = a.forecasts
-        self.actuals = a.actuals
+        self.a = forecast.analysis
+        self.hub = forecast.hub
+        self.forecast = forecast
+        self.actuals = forecast.actuals
+        self._cmd = cmd
+        self._msg = msg
 
-    def run(self, action, msg) -> bool:
-        """Run the rule and then the action if successful. return the result."""
-        result = self.eval_rule()
-        if result:
-            self.action(action, msg)
-        return result
+    def run(self):
+        self.hub.set_mode(self._cmd)
+        self.hub.update_status(self._msg)
 
-    def action(self, action: PowerSelectOptions, msg: str) -> None:
+    @property
+    def action(self) -> PowerSelectOptions:
         """Execute an action and write a status msg."""
+        return self._cmd
 
-        self.hub.set_mode(action)
-        self.hub.update_status(msg)
+    def run(self):
+        self.hub.set_mode(self._cmd)
+        self.hub.update_status(self._msg)
 
-    def eval_rule(self):
-        """Default just return True if just want to run actions regardless"""
+    def eval(self):
+        """Default just return True if just want to run actions regardless."""
         return True
 
 
-class Should_i_charge_as_not_enough_solar(baseDecide):
+class Should_i_charge_as_not_enough_solar(baseRule):
     """Works out whether now is a good time to charge battery if going to be importing in the next forecast window."""
 
-    def eval_rule(self):
+    def eval(self):
         """Eval rule for this one."""
         actuals = self.actuals
         FORECAST_WINDOW = 24
@@ -100,7 +126,7 @@ class Should_i_charge_as_not_enough_solar(baseDecide):
         blocks_to_charge = (
             int(
                 round(
-                    (1 - (actuals.battery_pct_level / 100))
+                    (1 - (actuals.battery_pct / 100))
                     * actuals.battery_max_usable_energy
                     / BATTERY_CHARGE_RATE,
                     0,
@@ -113,7 +139,7 @@ class Should_i_charge_as_not_enough_solar(baseDecide):
         battery_charged = next(
             (
                 i
-                for i, num in enumerate(self.forecasts.battery_energy)
+                for i, num in enumerate(self.forecast.battery_energy)
                 if num >= self.actuals.battery_max_energy
             ),
             None,
@@ -121,7 +147,7 @@ class Should_i_charge_as_not_enough_solar(baseDecide):
         firstgridimport = next(
             (
                 i
-                for i, num in enumerate(self.forecasts.export[0:FORECAST_WINDOW])
+                for i, num in enumerate(self.forecast.grid[0:FORECAST_WINDOW])
                 if num < 0
             ),
             None,
@@ -131,14 +157,14 @@ class Should_i_charge_as_not_enough_solar(baseDecide):
 
         if firstgridimport is None or (
             (battery_charged is not None and firstgridimport > battery_charged)
-            or actuals.battery_pct_level >= MAX_BATTERY_LEVEL
+            or actuals.battery_pct >= MAX_BATTERY_LEVEL
             or is_demand_window(datetime.datetime.now())
         ):
             return False
 
         if battery_charged is None or firstgridimport < battery_charged:
             first_no_grid_export = None
-            for i, num in enumerate(self.forecasts.export):
+            for i, num in enumerate(self.forecast.grid):
                 if num >= 0 and i > firstgridimport:
                     first_no_grid_export = i
                     break
@@ -150,7 +176,7 @@ class Should_i_charge_as_not_enough_solar(baseDecide):
         else:
             blocks_to_check = first_no_grid_export
 
-        blocks = self.forecasts.amber_scaled_price[0 : blocks_to_check - 1]
+        blocks = self.forecast.amber_scaled_price[0 : blocks_to_check - 1]
 
         if len(blocks) == 0:
             return False
@@ -161,10 +187,10 @@ class Should_i_charge_as_not_enough_solar(baseDecide):
         return False
 
 
-class ShouldIDischarge(baseDecide):
+class ShouldIDischarge(baseRule):
     """If i have available energy and the actual is as good as it gets in the next five hours (with margin) or there is a price spike in the next 5 hours and this is one of the best opportunities."""
 
-    def eval_rule(self):
+    def eval(self):
         if (
             self.actuals.available_battery_energy > self.actuals.battery_min_energy
         ) and (
@@ -191,10 +217,10 @@ class ShouldIDischarge(baseDecide):
         return False
 
 
-class ShouldIChargeforPriceSpike(baseDecide):
+class ShouldIChargeforPriceSpike(baseRule):
     """If i have available energy and the actual is as good as it gets in the next five hours (with margin) or there is a price spike in the next 5 hours and this is one of the best opportunities."""
 
-    def eval_rule(self):
+    def eval(self):
         """Evaluate rule."""
 
         if (
@@ -212,17 +238,17 @@ class ShouldIChargeforPriceSpike(baseDecide):
                 )
                 or self.a.charge_blocks_required_for_peak > self.a.start_high_prices
             )
-            and self.actuals.battery_pct_level < MAX_BATTERY_LEVEL
+            and self.actuals.battery_pct < MAX_BATTERY_LEVEL
         ):
             return True
 
         return False
 
 
-class PreserveWhileTeslaCharging(baseDecide):
+class PreserveWhileTeslaCharging(baseRule):
     """Whilst Tesla charging, stop battery from discharging."""
 
-    def eval_rule(self):
+    def eval(self):
         """Evaluate rule."""
 
         if self.hub.tesla_charging:
@@ -230,5 +256,5 @@ class PreserveWhileTeslaCharging(baseDecide):
         return False
 
 
-class MaximiseUsage(baseDecide):
+class MaximiseUsage(baseRule):
     """Just use default base class to execute actions."""
