@@ -182,10 +182,18 @@ class Should_i_charge_as_not_enough_solar(baseRule):
 
         blocks = self.forecast.amber_scaled_price[0 : blocks_to_check - 1]
 
-        if len(blocks) == 0:
+        if len(blocks) < 1 or blocks_to_charge == 0:
             return False
+
+        blocks_to_check = sorted(blocks)[0:blocks_to_charge]
+
+        if len(blocks_to_check) == 1:
+            val = blocks_to_check[0]
+        else:
+            val = max(blocks_to_check)
+
         # check whether a better time to charge. Should really work out how many blocks we need mim but on future iterations, should then eliminate export and never hit here. We will see...
-        if self.actuals.scaled_price <= max(sorted(blocks)[0:blocks_to_charge]):
+        if self.actuals.scaled_price < val:
             return True
 
         return False

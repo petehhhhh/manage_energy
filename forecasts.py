@@ -1,8 +1,7 @@
 from .const import (
     BATTERY_DISCHARGE_RATE,
     BATTERY_CHARGE_RATE,
-    CURTAIL_BATTERY_LEVEL,
-    DOMAIN,
+    REDUCED_CHARGE_RATE,
     PowerSelectOptions,
     TeslaModeSelectOptions,
     DEMAND_SCALE_UP,
@@ -44,13 +43,15 @@ class Actuals:
         self.battery_max_usable_energy = self.battery_max_energy * 0.97
 
         self.solar = self.get_entity_state("sensor.home_solar_power")
-        self.battery_charge_rate = self.get_entity_state("sensor.home_load_import") * -1
+        self.battery_charge_rate = (
+            self.get_entity_state("sensor.home_battery_power") * -1
+        )
         self.consumption = self.get_entity_state("sensor.home_site_power")
         self.curtailed = self.hub.curtailment
-        self.grid_energy = self.solar - self.consumption - self.battery_charge_rate
+        self.net_energy = self.solar - self.consumption - self.battery_charge_rate
         if self.curtailed:
-            self.grid_energy += self.solar
-
+            self.net_energy += self.solar
+        self.grid = round(-self.net_energy + self.battery_charge_rate, 1)
         self.available_battery_energy = (
             self.battery_max_energy * self.battery_pct / 100
         ) - (self.battery_max_energy - self.battery_max_usable_energy)
@@ -86,7 +87,7 @@ class Forecasts:
         self.net = []
         self.battery_energy = []
         self.battery_charge_rate = []
-        self.grid = []
+        self.net = []
         self.forecast_data = None
         self.recorder = get_instance(self.hub.hass)
         self.forecast = []
@@ -186,60 +187,53 @@ class Forecasts:
         return consumption, solar
 
     def calc_battery_percent(self, battery_energy_level: float) -> float:
-        return battery_energy_level / self.actuals.battery_max_energy
+        return battery_energy_level / self.actuals.battery_max_energy * 100
 
     def forecast_battery_and_grid(self, f):
         # current energy in battery is the level of the battery less the unusable energy circa 10%
 
         battery_energy_level = f.actuals.available_battery_energy
         battery_forecast = []
-        grid_forecast = []
         pct_forecast = []
         battery_charge_rate_forecast = []
+        grid_forecast = []
         for forecast_net_energy in f.net:
             # assume battery is charged at 5kw and discharged at 5kw and calc based on net energy upto 5kw for a half hour period ie KWH = KW/2
-            battery_energy_level, net, battery_pct, battery_charge_rate = (
-                self.calc_battery_and_net(battery_energy_level, forecast_net_energy)
+            battery_pct, battery_charge_rate, grid = self.calc_battery_and_grid(
+                battery_energy_level, forecast_net_energy
             )
 
             battery_forecast.append(battery_energy_level)
-            grid_forecast.append(net)
             pct_forecast.append(battery_pct)
             battery_charge_rate_forecast.append(battery_charge_rate)
+            grid_forecast.append(grid)
+            battery_energy_level = self.calc_battery_energy(
+                f.actuals.available_battery_energy, battery_charge_rate
+            )
 
         return (
             battery_forecast,
-            grid_forecast,
             pct_forecast,
             battery_charge_rate_forecast,
+            grid_forecast,
         )
 
-    def calc_battery_and_net(self, battery_energy_level: float, net_energy: float):
+    def calc_battery_and_grid(
+        self,
+        battery_energy_level: float,
+        net_energy: float,
+        action=PowerSelectOptions.MAXIMISE,
+    ):
         # assume battery is charged at 5kw and discharged at 5kw and calc based on net energy upto 5kw for a half hour period ie KWH = KW/2
         battery_pct = self.calc_battery_percent(battery_energy_level)
-        if battery_pct >= 1 and net_energy > 0:
-            battery_charge_rate = 0
 
-        elif battery_pct > 0.9 * self.actuals.battery_max_energy and net_energy > 1:
-            # if battery is charging and over 90% then assume charging current = 1kw
-            battery_charge_rate = 5
-        elif net_energy > BATTERY_DISCHARGE_RATE:
-            battery_charge_rate = BATTERY_DISCHARGE_RATE
-
-        elif (
-            battery_pct
-            <= (self.actuals.battery_min_energy / self.actuals.battery_max_energy)
-            and net_energy < 0
-        ):
-            battery_charge_rate = 0
-
-        elif net_energy < -1 * BATTERY_DISCHARGE_RATE:
-            battery_charge_rate = -1 * BATTERY_DISCHARGE_RATE
-
-        else:
-            battery_charge_rate = net_energy
+        battery_charge_rate = self.calc_battery_charge_rate(
+            net_energy, battery_energy_level, action
+        )
 
         battery_energy_level = battery_energy_level + battery_charge_rate / 2
+
+        grid = battery_charge_rate - net_energy
 
         # make sure battery never exeeds max or min
         if battery_energy_level > self.actuals.battery_max_energy:
@@ -247,12 +241,7 @@ class Forecasts:
         elif battery_energy_level < self.actuals.battery_min_energy:
             battery_energy_level = self.actuals.battery_min_energy
 
-        return (
-            battery_energy_level,
-            (net_energy - battery_charge_rate),
-            int(battery_pct * 100),
-            battery_charge_rate,
-        )
+        return (int(battery_pct), battery_charge_rate, grid)
 
     def store_forecast(self):
         """Store the forecast for use in a sensor."""
@@ -277,7 +266,7 @@ class Forecasts:
                     "consumption": round(self.consumption[i], 1),
                     "net": round(self.net[i], 1),
                     "battery": self.battery_pct[i],
-                    "export": round(self.grid[i], 1),
+                    "grid": round(self.grid[i], 1),
                     "action": action,
                     "rule": rule,
                     "battery_charge_rate": self.battery_charge_rate[i],
@@ -307,7 +296,7 @@ class Forecasts:
                 "battery": int(
                     self.battery_energy[6] / self.actuals.battery_max_energy * 100
                 ),
-                "export": self.grid[6],
+                "export": self.net[6],
             }
         )
         # search for start_time in history and store actuals for that time - effectively stores the actuals versus forecast generated 3 hours ago
@@ -346,9 +335,12 @@ class Forecasts:
         else:
             self.solar = solar_forecast
         self.net = [s - c for s, c in zip(self.solar, self.consumption)]
-        self.battery_energy, self.grid, self.battery_pct, self.battery_charge_rate = (
-            self.forecast_battery_and_grid(self)
-        )
+        (
+            self.battery_energy,
+            self.battery_pct,
+            self.battery_charge_rate,
+            self.grid,
+        ) = self.forecast_battery_and_grid(self)
         self.analysis = Analysis(self, actuals, self.hub)
         self.analysis.analyze_price_peaks()
         self.actuals.rule = Decide(self).Decide_Battery_Action()
@@ -365,6 +357,9 @@ class Forecasts:
 
         ff = Forecasts(self.hub)
         ff.actuals = self.actuals
+        a = ff.actuals
+        self.action = [None] * len(self.amber_feed_in)
+        self.rule = [None] * len(self.amber_feed_in)
 
         for i in range(
             len(self.amber_feed_in)
@@ -374,10 +369,12 @@ class Forecasts:
             ff.analysis = Analysis(ff, ff.actuals, self.hub)
             ff.analysis.analyze_price_peaks()
             decision = Decide(ff)
-            ff.actuals.rule = decision.rule
+            a.rule = decision.rule
 
-            ff.actuals.action = decision.rule.action
-            ff.actuals.battery_charge_rate = self.calc_battery_charge_rate(ff.actuals)
+            a.action = decision.rule.action
+            a.battery_pct, a.battery_charge_rate, a.grid = self.calc_battery_and_grid(
+                a.available_battery_energy, a.net_energy, a.action
+            )
 
             self.update_forecast(ff, i)
 
@@ -385,15 +382,25 @@ class Forecasts:
         self.actuals.rule = Decide(self).Decide_Battery_Action()
         self.actuals.action = self.actuals.rule.action
 
+    def calc_battery_energy(self, current_energy, charge_rate):
+        energy = current_energy + charge_rate / 2
+        if energy > self.actuals.battery_max_energy:
+            energy = self.actuals.battery_max_energy
+        elif energy < self.actuals.battery_min_energy:
+            energy = self.actuals.battery_min_energy
+
+        return energy
+
     def update_forecast(self, ff, i):
         """ "Capture the actual action and values in original forecast."""
         a: Actuals
         a = self.actuals
 
         self.battery_charge_rate[i] = a.battery_charge_rate
-        self.action.append(a.action)
-        self.rule.append(a.rule)
-        self.grid[i] = a.grid_energy
+        self.action[i] = a.action
+        self.rule[i] = a.rule
+        self.net[i] = a.net_energy
+        self.grid[i] = a.grid
         self.battery_energy[i] = a.available_battery_energy
         self.battery_pct[i] = a.battery_pct
 
@@ -401,31 +408,29 @@ class Forecasts:
         """Build actuals for next forecast in spot 0. Assumes actuals contains last actuals."""
         a: Actuals
         a = self.actuals
-
-        (
-            a.available_battery_energy,
-            a.grid_energy,
-            a.battery_pct,
-            a.battery_charge_rate,
-        ) = self.calc_battery_and_net(a.available_battery_energy, a.battery_charge_rate)
+        a.available_battery_energy = self.calc_battery_energy(
+            a.available_battery_energy, a.battery_charge_rate
+        )
 
         a.scaled_price = self.amber_scaled_price[i]
         a.feedin = self.amber_feed_in[i]
         a.solar = self.solar[i]
         a.consumption = self.consumption[i]
-        a.grid_energy = a.solar - a.consumption - a.battery_charge_rate
+        a.net_energy = a.solar - a.consumption
+
+        (a.battery_pct, a.battery_charge_rate, a.grid) = self.calc_battery_and_grid(
+            a.available_battery_energy, a.net_energy
+        )
+
         # self.curtailed = self.hub.curtailment
 
         # if self.curtailed:
         #    self.excess_energy += self.solar
 
-    def calc_battery_charge_rate(self, prior_actuals):
+    def calc_battery_charge_rate(self, net_power, available_battery_energy, action):
         """Calculates the battery charge rate based on action and accounting for battery max and min"""
-        a: Actuals
-        a = prior_actuals
-        net_power = a.solar - a.consumption
 
-        match a.action.value:
+        match action.value:
             case PowerSelectOptions.CHARGE:
                 rate = BATTERY_CHARGE_RATE
             case PowerSelectOptions.DISCHARGE:
@@ -433,13 +438,18 @@ class Forecasts:
             case PowerSelectOptions.MAXIMISE:
                 rate = net_power
             case PowerSelectOptions.OFF:
-                if a.available_battery_energy > a.battery_max_energy:
-                    rate = max(0, net_power)
+                rate = max(0, net_power)
 
-        if (rate < 0 and a.available_battery_energy < a.battery_min_energy) or (
-            rate > 0 and a.available_battery_energy > a.battery_max_energy
-        ):
-            rate = 0
+        if rate > 0:
+            rate = min(rate, BATTERY_CHARGE_RATE)
+        else:
+            rate = max(rate, BATTERY_DISCHARGE_RATE * -1)
+
+        if available_battery_energy > self.actuals.battery_max_energy:
+            rate = min(0, rate)
+
+        if available_battery_energy < self.actuals.battery_min_energy:
+            rate = max(0, rate)
 
         return rate
 

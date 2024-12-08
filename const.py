@@ -7,6 +7,8 @@ from enum import StrEnum, IntEnum
 DOMAIN = "manage_energy"
 MIN_MARGIN = 0.2
 BATTERY_DISCHARGE_RATE = 8
+# Rate battery charges when gets above 95%
+REDUCED_CHARGE_RATE = 4
 BATTERY_CHARGE_RATE = 7
 CURTAIL_BATTERY_LEVEL = 95
 MAX_BATTERY_LEVEL = 99
