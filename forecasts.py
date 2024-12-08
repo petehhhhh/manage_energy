@@ -380,7 +380,7 @@ class Forecasts:
 
             self.update_forecast(ff, i)
 
-        self.actuals.refresh
+        self.actuals.refresh()
         self.actuals.rule = Decide(self).Decide_Battery_Action()
         self.actuals.action = self.actuals.rule.action
 
