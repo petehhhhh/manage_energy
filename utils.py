@@ -4,7 +4,7 @@ from .const import (
 )
 
 
-def is_demand_window(t: datetime):
+def is_demand_window(t: datetime = datetime.now()):
     """Is the passed datetime wihtin the demand window."""
     # Define peak period months: June to August and November to March
     peak_months = list(range(6, 9)) + [11, 12, 1, 2, 3]

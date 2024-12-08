@@ -37,6 +37,9 @@ class Decide:
         # lambda functions allow to load into an array of rules. Rules are defined in decide.py
 
         self.rules = [
+            lambda: ChargeInNegativePrices(
+                f, 0, PowerSelectOptions.CHARGE, "Charging. Negative Prices."
+            ),
             lambda: ShouldIDischarge(
                 f, 1, PowerSelectOptions.DISCHARGE, "Discharging into Price Spike"
             ),
@@ -117,6 +120,18 @@ class baseRule:
     def eval(self):
         """Default just return True if just want to run actions regardless."""
         return True
+
+
+class ChargeInNegativePrices(baseRule):
+    """If negative prices, then charge the battery. Even if full will stop discharging...."""
+
+    def eval(self):
+        """Evaluate rule."""
+
+        if self.actuals.price < 0 and not is_demand_window():
+            return True
+
+        return False
 
 
 class Should_i_charge_as_not_enough_solar(baseRule):
