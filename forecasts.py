@@ -17,7 +17,7 @@ from homeassistant.core import HomeAssistant, StateMachine
 from homeassistant.components.recorder import get_instance
 from homeassistant.components.recorder.history import state_changes_during_period
 from homeassistant.helpers.event import async_track_time_interval, async_call_later
-from datetime import datetime, time, date, timedelta
+from datetime import datetime, timedelta
 from .analyse import Analysis
 from .decide import Decide
 from .utils import is_demand_window, scale_price_for_demand_window
@@ -193,11 +193,12 @@ class Forecasts:
         # current energy in battery is the level of the battery less the unusable energy circa 10%
 
         battery_energy_level = f.actuals.available_battery_energy
+        start_time = datetime.now()
         battery_forecast = []
         pct_forecast = []
         battery_charge_rate_forecast = []
         grid_forecast = []
-        for forecast_net_energy in f.net:
+        for i, forecast_net_energy in enumerate(f.net):
             # assume battery is charged at 5kw and discharged at 5kw and calc based on net energy upto 5kw for a half hour period ie KWH = KW/2
             battery_pct, battery_charge_rate, grid = self.calc_battery_and_grid(
                 battery_energy_level, forecast_net_energy
@@ -208,8 +209,9 @@ class Forecasts:
             battery_charge_rate_forecast.append(battery_charge_rate)
             grid_forecast.append(grid)
             battery_energy_level = self.calc_battery_energy(
-                f.actuals.available_battery_energy, battery_charge_rate
+                battery_energy_level, battery_charge_rate, start_time, f.start_time[i]
             )
+            start_time = f.start_time[i]
 
         return (
             battery_forecast,
@@ -382,8 +384,14 @@ class Forecasts:
         self.actuals.rule = Decide(self).Decide_Battery_Action()
         self.actuals.action = self.actuals.rule.action
 
-    def calc_battery_energy(self, current_energy, charge_rate):
-        energy = current_energy + charge_rate / 2
+    def calc_battery_energy(
+        self, current_energy, charge_rate, start: datetime, finish: datetime
+    ):
+        start = start.replace(tzinfo=None)
+        finish = finish.replace(tzinfo=None)
+
+        portion_of_hour = (finish - start).total_seconds() / 3600
+        energy = current_energy + charge_rate * portion_of_hour
         if energy > self.actuals.battery_max_energy:
             energy = self.actuals.battery_max_energy
         elif energy < self.actuals.battery_min_energy:
@@ -408,8 +416,16 @@ class Forecasts:
         """Build actuals for next forecast in spot 0. Assumes actuals contains last actuals."""
         a: Actuals
         a = self.actuals
+        if i == 0:
+            start_time = datetime.now()
+        else:
+            start_time = self.start_time[i - 1]
+
         a.available_battery_energy = self.calc_battery_energy(
-            a.available_battery_energy, a.battery_charge_rate
+            a.available_battery_energy,
+            a.battery_charge_rate,
+            start_time,
+            self.start_time[i],
         )
 
         a.scaled_price = self.amber_scaled_price[i]
@@ -448,7 +464,7 @@ class Forecasts:
         if available_battery_energy > self.actuals.battery_max_energy:
             rate = min(0, rate)
 
-        if available_battery_energy < self.actuals.battery_min_energy:
+        if available_battery_energy <= self.actuals.battery_min_energy:
             rate = max(0, rate)
 
         return rate
