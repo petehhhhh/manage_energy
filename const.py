@@ -10,7 +10,7 @@ BATTERY_DISCHARGE_RATE = 8
 # Rate battery charges when gets above 95%
 REDUCED_CHARGE_RATE = 4
 BATTERY_CHARGE_RATE = 7
-CURTAIL_BATTERY_LEVEL = 95
+CURTAIL_BATTERY_LEVEL = 97
 MAX_BATTERY_LEVEL = 99
 # how much to add to general forecast price for when in demand window.... 30 days at 30 cents for 5 extra kW...
 DEMAND_SCALE_UP = 30 * 5 * 0.3 / 8
