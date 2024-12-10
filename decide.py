@@ -9,7 +9,7 @@ from homeassistant.core import HomeAssistant, StateMachine  # type: ignore
 from homeassistant.components.recorder import get_instance  # type: ignore
 from homeassistant.components.recorder.history import state_changes_during_period  # type: ignore
 from homeassistant.helpers.event import async_track_time_interval, async_call_later  # type: ignore
-from .utils import is_demand_window
+from .utils import is_demand_window, safe_max
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -265,7 +265,8 @@ class ShouldIChargeforPriceSpike(baseRule):
                 )
                 or self.a.charge_blocks_required_for_peak > self.a.start_high_prices
             )
-            and self.actuals.battery_pct < MAX_BATTERY_LEVEL
+            #If battery never hits peak before start of high prices...
+            and safe_max(self.battery_pct[0:self.a.start_high_prices]) < MAX_BATTERY_LEVEL
         ):
             return True
 
