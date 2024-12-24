@@ -70,7 +70,7 @@ class TeslaCharging:
                 hass.states.get("sensor.pete_s_tesla_via_fleet_battery").state
             )
 
-            isDemandWindow = await actuals._hub.is_demand_window()
+            isDemandWindow = await self._hub.is_demand_window()
 
             if (
                 actuals._mode == TeslaModeSelectOptions.FAST_GRID
