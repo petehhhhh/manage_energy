@@ -120,7 +120,7 @@ class TeslaModeSelect(BaseSelect):
         self._attributes["state"] = self._state
         self.set_available(False)
         try:
-            await self._hub.set_tesla_mode(option)
+            await self._hub.tesla.set_mode(option)
         finally:
             self.set_available(True)
 

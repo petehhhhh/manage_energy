@@ -47,7 +47,7 @@ class manage_energy:
         self._locked = False
         self._curtailment = False
         self._auto = True
-        self._tesla_amps = 0
+        self.tesla = TeslaCharging(self)
 
         self._mode = PowerSelectOptions.MAXIMISE
         self._tesla_mode = TeslaModeSelectOptions.AUTO
@@ -223,15 +223,14 @@ class manage_energy:
             await self.forecasts.build()
 
             self.clear_status()
-            tesla = TeslaCharging(self)
 
-            self.tesla_charging = await tesla.tesla_charging(self.forecasts)
+            self.tesla_charging = await self.tesla.tesla_charging(self.forecasts)
             # Now we can now make a decision if we start to feed in...
 
             if self._auto:
                 self.forecasts.actuals.rule.run()
                 if (
-                    #                  not self.tesla_charging
+                    #   not self.tesla_charging
                     self.forecasts.actuals.battery_pct >= CURTAIL_BATTERY_LEVEL
                     and self.forecasts.actuals.feedin < 0
                 ):

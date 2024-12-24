@@ -23,31 +23,32 @@ class TeslaCharging:
     def __init__(self, hub):
         self._hass = hub.hass
         self._hub = hub
-        self.actuals = hub.forecasts.actuals
 
-    async def set_tesla_mode(self, mode):
-        self._tesla_mode = mode
+        self.amps = 0
+
+    async def set_mode(self, mode):
+        self._mode = mode
         await self._hass.services.async_call(
             "button", "press", {"entity_id": "button.pete_s_tesla_force_data_update"}
         )
 
-        await self.refresh()
+        await self._hub.refresh()
 
     async def tesla_charging(self, forecasts):  # noqa: D102
         _LOGGER.info("Checking whether to charge Tesla")
         # Turn Tesla charging on if the plugged in and at home.
         try:
+            actuals = self._hub.forecasts.actuals
+            hass = self._hass
             tesla_home = (
-                self._hass.states.get("binary_sensor.pete_s_tesla_presence").state
-                == "on"
+                hass.states.get("binary_sensor.pete_s_tesla_presence").state == "on"
             )
             cheap_price = (
-                float(self._hass.states.get("input_number.cheap_grid_price").state)
-                / 100
+                float(hass.states.get("input_number.cheap_grid_price").state) / 100
             )
 
             tesla_charger_door_closed = (
-                self._hass.states.get("cover.pete_s_tesla_via_fleet_charger_door").state
+                hass.states.get("cover.pete_s_tesla_via_fleet_charger_door").state
                 != "open"
             )
 
@@ -55,104 +56,100 @@ class TeslaCharging:
                 return False
 
             tesla_charging = (
-                self._hass.states.get(
-                    "binary_sensor.pete_s_tesla_via_fleet_charging"
-                ).state
+                hass.states.get("binary_sensor.pete_s_tesla_via_fleet_charging").state
                 == "on"
             )
             charge_limit = int(
-                self._hass.states.get(
-                    "number.pete_s_tesla_via_fleet_charge_limit"
-                ).state
+                hass.states.get("number.pete_s_tesla_via_fleet_charge_limit").state
             )
             current_amps = int(
-                self._hass.states.get(
-                    "number.pete_s_tesla_via_fleet_charging_amps"
-                ).state
+                hass.states.get("number.pete_s_tesla_via_fleet_charging_amps").state
             )
 
             current_charge = int(
-                self._hass.states.get("sensor.pete_s_tesla_via_fleet_battery").state
+                hass.states.get("sensor.pete_s_tesla_via_fleet_battery").state
             )
 
-            isDemandWindow = await self._hub.is_demand_window()
+            isDemandWindow = await actuals._hub.is_demand_window()
 
             if (
-                self._tesla_mode == TeslaModeSelectOptions.FAST_GRID
+                actuals._mode == TeslaModeSelectOptions.FAST_GRID
                 or (
                     (
-                        self.actuals.price <= cheap_price
-                        and self._tesla_mode == TeslaModeSelectOptions.CHEAP_GRID
+                        actuals.actuals.price <= cheap_price
+                        and actuals._mode == TeslaModeSelectOptions.CHEAP_GRID
                     )
-                    or self.actuals.price <= 0
+                    or actuals.actuals.price <= 0
                 )
                 and not isDemandWindow
             ):
-                charge_amps = 16
+                actuals.amps = 16
             else:
-                if self.actuals.feedin <= cheap_price:
-                    charge_amps = round(self.actuals.excess_energy * 1000 / 240 / 3, 0)
+                if actuals.actuals.feedin <= cheap_price:
+                    actuals.amps = round(
+                        actuals.actuals.excess_energy * 1000 / 240 / 3, 0
+                    )
                     if tesla_charging:
-                        charge_amps += self._tesla_amps
-                    if charge_amps < 0:
-                        charge_amps = 0
-                elif self.actuals.feedin > cheap_price:
-                    charge_amps = 0
+                        actuals.amps += actuals._tesla_amps
+                    if actuals.amps < 0:
+                        actuals.amps = 0
+                elif actuals.actuals.feedin > cheap_price:
+                    actuals.amps = 0
 
-            if charge_limit > current_charge and charge_amps > 0:
-                await self._hass.services.async_call(
+            if charge_limit > current_charge and actuals.amps > 0:
+                await hass.services.async_call(
                     "number",
                     "set_value",
                     {
                         "entity_id": " number.pete_s_tesla_charging_amps",
-                        "value": charge_amps,
+                        "value": actuals.amps,
                     },
                     True,
                 )
-                self._tesla_amps = charge_amps
+                actuals._tesla_amps = actuals.amps
 
-                await self._hass.services.async_call(
+                await hass.services.async_call(
                     "switch",
                     "turn_on",
                     {"entity_id": "switch.pete_s_tesla_charger"},
                     True,
                 )
-                self._hub.update_status(
-                    "Charging Tesla at " + str(charge_amps) + " amps"
+                actuals._hub.update_status(
+                    "Charging Tesla at " + str(actuals.amps) + " amps"
                 )
                 return True
             else:
                 if charge_limit <= current_charge:
-                    self._hub.update_status("Tesla: charge limit reached.")
+                    actuals._hub.update_status("Tesla: charge limit reached.")
                 elif (
-                    self.actuals.price > self._cheap_price
-                    and self._tesla_mode == TeslaModeSelectOptions.CHEAP_GRID
+                    actuals.actuals.price > actuals._cheap_price
+                    and actuals._mode == TeslaModeSelectOptions.CHEAP_GRID
                 ):
-                    self._hub.update_status(
+                    actuals._hub.update_status(
                         "Tesla: Grid price over maximum of "
-                        + str(self._cheap_price)
+                        + str(actuals._cheap_price)
                         + " cents."
                     )
                 else:
                     if (
                         isDemandWindow
-                        and self._tesla_mode == TeslaModeSelectOptions.CHEAP_GRID
-                        and self.actuals.price <= cheap_price
+                        and actuals._mode == TeslaModeSelectOptions.CHEAP_GRID
+                        and actuals.actuals.price <= cheap_price
                     ):
-                        self._hub.update_status("Tesla: In demand window.")
-                    elif self.actuals.feedin <= cheap_price:
-                        self._hub.update_status("Tesla: No excess solar.")
+                        actuals._hub.update_status("Tesla: In demand window.")
+                    elif actuals.actuals.feedin <= cheap_price:
+                        actuals._hub.update_status("Tesla: No excess solar.")
                     else:
-                        self._hub.update_status("Tesla: Feed in over cheap price.")
+                        actuals._hub.update_status("Tesla: Feed in over cheap price.")
 
-                await self._hass.services.async_call(
+                await hass.services.async_call(
                     "switch",
                     "turn_off",
                     {"entity_id": "switch.pete_s_tesla_charger"},
                     True,
                 )
                 if current_amps != 16:
-                    await self._hass.services.async_call(
+                    await hass.services.async_call(
                         "number",
                         "set_value",
                         {
