@@ -58,6 +58,7 @@ class Actuals:
         self.battery_min_energy = (
             self.battery_max_energy - self.battery_max_usable_energy
         )
+        self.time = datetime.now()
 
     def get_entity_state(self, entity_id, attribute=None):
         # get the current value of an entity or its attribute
@@ -429,7 +430,9 @@ class Forecasts:
         )
 
         a.scaled_price = self.amber_scaled_price[i]
+        a.price = self.amber_price[i]
         a.feedin = self.amber_feed_in[i]
+        a.time = self.start_time[i]
         a.solar = self.solar[i]
         a.consumption = self.consumption[i]
         a.net_energy = a.solar - a.consumption
