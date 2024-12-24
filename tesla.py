@@ -14,6 +14,7 @@ from homeassistant.components.recorder import get_instance
 from homeassistant.components.recorder.history import state_changes_during_period
 from homeassistant.helpers.event import async_track_time_interval, async_call_later
 
+from .utils import isDemandWindow
 _LOGGER = logging.getLogger(__name__)
 
 
@@ -70,7 +71,7 @@ class TeslaCharging:
                 hass.states.get("sensor.pete_s_tesla_via_fleet_battery").state
             )
 
-            isDemandWindow = await self._hub.is_demand_window()
+            isDemandWindow = is_Demand_Window()
 
             if (
                 actuals._mode == TeslaModeSelectOptions.FAST_GRID
