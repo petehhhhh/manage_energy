@@ -128,7 +128,7 @@ class ChargeInNegativePrices(baseRule):
     def eval(self):
         """Evaluate rule."""
 
-        if self.actuals.price < 0 and not is_demand_window():
+        if self.actuals.price < 0 and not is_demand_window(self.actuals.time):
             return True
 
         return False
@@ -235,7 +235,7 @@ class ShouldIDischarge(baseRule):
                 and len(self.a.available_max_values) > 0
                 and self.actuals.feedin >= 0.9 * min(self.a.available_max_values)
                 and self.a.has_sufficient_margin(
-                    self.actuals.feedin, min(self.a.next12hours)
+                    self.actuals.feedin, min(self.a.next12hours[0:10])
                 )
             )
         ):
