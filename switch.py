@@ -28,7 +28,6 @@ class SolarCurtailmentSwitch(SwitchEntity):
 
     def __init__(self, name, title, hub):
         self._id = name
-        self._state = False
         self._hub = hub
 
         self._name = title
@@ -49,6 +48,8 @@ class SolarCurtailmentSwitch(SwitchEntity):
             "unique_id": self._unique_id,
         }
 
+        self._hub.add_listener(self._on_hub_state_changed)
+
     @property
     def device_info(self) -> dict:
         """Return device information about this entity."""
@@ -67,8 +68,7 @@ class SolarCurtailmentSwitch(SwitchEntity):
     @property
     def is_on(self):
         """Return true if switch is on."""
-        self._state = self._hub.curtailment
-        return self._state
+        return self._hub.curtailment
 
     @property
     def unique_id(self) -> str:
@@ -80,21 +80,19 @@ class SolarCurtailmentSwitch(SwitchEntity):
         """Return True if auto mode not enabled."""
         return True
 
+    def _on_hub_state_changed(self, new_state):
+        """Handle when the hub's state changes."""
+        self.async_write_ha_state()
+
     async def async_turn_on(self, **kwargs):
         """Turn the switch on."""
-        self._state = True
-        await self._hub.set_solar_curtailment(self._state)
+        await self._hub.set_solar_curtailment(True)
         self.async_write_ha_state()
 
     async def async_turn_off(self, **kwargs):
         """Turn the switch off."""
-        self._state = False
-        await self._hub.set_solar_curtailment(self._state)
+        await self._hub.set_solar_curtailment(False)
         self.async_write_ha_state()
-
-    async def async_update(self):
-        """Update the state of the switch."""
-        self._state = self._hub.curtailment
 
     async def async_added_to_hass(self):
         """Handle when the entity is added to Home Assistant."""

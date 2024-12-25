@@ -133,7 +133,7 @@ class manage_energy:
 
     async def set_solar_curtailment(self, state):
         self._curtailment = state
-        await self.refresh()
+        self._notify_listeners()
 
     async def get_solar_curtailment(self):
         return self._curtailment
@@ -187,6 +187,8 @@ class manage_energy:
 
     async def curtail_solar(self):
         _LOGGER.info("Curtailing solar")
+        self._curtailment = True
+        self._notify_listeners()
 
     async def maximise_self(self):
         _LOGGER.info("Maximising self consumption")
@@ -194,6 +196,8 @@ class manage_energy:
 
     async def uncurtail_solar(self):
         _LOGGER.info("Uncurtailing Solar")
+        self._curtailment = False
+        self._notify_listeners()
 
     async def auto_mode(self) -> bool:
         if self._auto:
