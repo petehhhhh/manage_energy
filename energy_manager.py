@@ -42,7 +42,7 @@ class manage_energy:
         self._name = host
         self._poll_frequency = int(poll_frequency)
         self.minimum_margin = float(minimum_margin) / 100
-        self._cheap_price = cheap_price / 100
+        self.cheap_price = cheap_price / 100
         self.manufacturer = "Pete"
         self._locked = False
         self._curtailment = False
@@ -65,8 +65,8 @@ class manage_energy:
         )
         self.forecasts = Forecasts(self)
 
-    def set_cheap_price(self, value):
-        self._cheap_price = value / 100
+    def setcheap_price(self, value):
+        self.cheap_price = value / 100
 
     def add_listener(self, callback):
         """Add a listener that will be notified when the state changes."""
