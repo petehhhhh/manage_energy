@@ -41,6 +41,7 @@ class TeslaCharging:
         try:
             actuals = self._hub.forecasts.actuals
             hass = self._hass
+            hub = self._hub
             tesla_home = (
                 hass.states.get("binary_sensor.pete_s_tesla_presence").state == "on"
             )
@@ -74,11 +75,11 @@ class TeslaCharging:
             isDemandWindow = is_demand_window()
 
             if (
-                actuals._mode == TeslaModeSelectOptions.FAST_GRID
+                self._mode == TeslaModeSelectOptions.FAST_GRID
                 or (
                     (
                         actuals.actuals.price <= cheap_price
-                        and actuals._mode == TeslaModeSelectOptions.CHEAP_GRID
+                        and self._mode == TeslaModeSelectOptions.CHEAP_GRID
                     )
                     or actuals.actuals.price <= 0
                 )
@@ -124,7 +125,7 @@ class TeslaCharging:
                     actuals._hub.update_status("Tesla: charge limit reached.")
                 elif (
                     actuals.actuals.price > actuals._cheap_price
-                    and actuals._mode == TeslaModeSelectOptions.CHEAP_GRID
+                    and self._mode == TeslaModeSelectOptions.CHEAP_GRID
                 ):
                     actuals._hub.update_status(
                         "Tesla: Grid price over maximum of "
@@ -134,7 +135,7 @@ class TeslaCharging:
                 else:
                     if (
                         isDemandWindow
-                        and actuals._mode == TeslaModeSelectOptions.CHEAP_GRID
+                        and self._mode == TeslaModeSelectOptions.CHEAP_GRID
                         and actuals.actuals.price <= cheap_price
                     ):
                         actuals._hub.update_status("Tesla: In demand window.")
