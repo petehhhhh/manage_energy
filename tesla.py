@@ -76,20 +76,31 @@ class TeslaCharging:
             isDemandWindow = is_demand_window()
 
             if (
-                self._mode == TeslaModeSelectOptions.FAST_GRID
-                or (
-                    (
-                        actuals.price <= cheap_price
-                        and self._mode == TeslaModeSelectOptions.CHEAP_GRID
+                (
+                    self._mode == TeslaModeSelectOptions.FAST_GRID
+                    or (
+                        (
+                            actuals.price <= cheap_price
+                            and self._mode == TeslaModeSelectOptions.CHEAP_GRID
+                        )
+                        or actuals.price <= 0
                     )
-                    or actuals.price <= 0
                 )
-                and not isDemandWindow
-            ):
+                or actuals.price <= 0
+            ) and not isDemandWindow:
                 self.amps = 16
+
             else:
                 if actuals.feedin <= cheap_price:
-                    self.amps = round(actuals.net_energy * 1000 / 240 / 3, 0)
+                    if actuals.battery_pct < 100:
+                        battery_charge = BATTERY_DISCHARGE_RATE
+                    else:
+                        battery_charge = 0
+
+                    self.amps = round(
+                        (actuals.net_energy - battery_charge) * 1000 / 240 / 3,
+                        0,
+                    )
                     if tesla_charging:
                         self.amps += self._tesla_amps
                     self.amps = max(self.amps, 0)
