@@ -93,6 +93,7 @@ class TeslaCharging:
                     if tesla_charging:
                         self.amps += self._tesla_amps
                     self.amps = max(self.amps, 0)
+                    self.amps = min(self.amps, 16)
                 elif actuals.feedin > cheap_price:
                     self.amps = 0
 
@@ -134,11 +135,11 @@ class TeslaCharging:
                         and self._mode == TeslaModeSelectOptions.CHEAP_GRID
                         and actuals.price <= cheap_price
                     ):
-                        hub.update_status("Tesla: In demand window.")
+                        hub.update_status("Tesla: In demand window")
                     elif actuals.feedin <= cheap_price:
-                        hub.update_status("Tesla: No excess solar.")
+                        hub.update_status("Tesla: No excess solar")
                     else:
-                        hub.update_status("Tesla: Feed in over cheap price.")
+                        hub.update_status("Tesla: Feed in over cheap price")
 
                 await hass.services.async_call(
                     "switch",
