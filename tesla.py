@@ -101,7 +101,7 @@ class TeslaCharging:
                     "number",
                     "set_value",
                     {
-                        "entity_id": " number.pete_s_tesla_charging_amps",
+                        "entity_id": " number.pete_s_tesla_via_fleet_charging_amps",
                         "value": self.amps,
                     },
                     True,
@@ -111,7 +111,7 @@ class TeslaCharging:
                 await hass.services.async_call(
                     "switch",
                     "turn_on",
-                    {"entity_id": "switch.pete_s_tesla_charger"},
+                    {"entity_id": "switch.pete_s_tesla_via_fleet_charger"},
                     True,
                 )
                 hub.update_status("Charging Tesla at " + str(self.amps) + " amps")

@@ -46,12 +46,12 @@ class Actuals:
         self.battery_charge_rate = (
             self.get_entity_state("sensor.home_battery_power") * -1
         )
-        self.consumption = self.get_entity_state("sensor.home_site_power")
+        self.consumption = self.get_entity_state("sensor.home_load_power")
         self.curtailed = self.hub.curtailment
-        self.net_energy = self.solar - self.consumption - self.battery_charge_rate
+        self.net_energy = self.solar - self.consumption
         if self.curtailed:
             self.net_energy += self.solar
-        self.grid = round(-self.net_energy + self.battery_charge_rate, 1)
+        self.grid = self.get_entity_state("sensor.home_site_power")
         self.available_battery_energy = (
             self.battery_max_energy * self.battery_pct / 100
         ) - (self.battery_max_energy - self.battery_max_usable_energy)
