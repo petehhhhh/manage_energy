@@ -364,9 +364,7 @@ class Forecasts:
         self.action = [None] * len(self.amber_feed_in)
         self.rule = [None] * len(self.amber_feed_in)
 
-        for i in range(
-            len(self.amber_feed_in)
-        ):  # range(24) generates numbers from 0 to 23
+        for i in range(len(self.amber_feed_in)):
             self.build_fwd_actuals(ff, i)
             ff = self.build_fwd_forecast(ff, i)
             ff.analysis = Analysis(ff, ff.actuals, self.hub)
