@@ -30,7 +30,7 @@ SENSORS: dict[str, SensorEntityDescription] = {
     "status": SensorEntityDescription(
         key="manage-energy-status",
         translation_key="status",
-        name="Status",
+        name="Manage Energy Status",
         icon="mdi:gauge-low",
         entity_category=EntityCategory.DIAGNOSTIC,
     ),
@@ -85,7 +85,6 @@ class SensorBase(SensorEntity, RestoreEntity):
             ATTR_MODEL: "Energy Model",
         }
         self._attr_unique_id = entity_description.key
-        self._unique_id = entity_description.key
 
     @property
     def should_poll(self) -> bool:
