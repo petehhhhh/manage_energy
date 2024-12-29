@@ -1,4 +1,5 @@
 """Config flow for Hello World integration."""
+
 from __future__ import annotations
 
 import logging
@@ -28,8 +29,7 @@ _LOGGER = logging.getLogger(__name__)
 # figure this out or look further into it.
 # DATA_SCHEMA = vol.Schema({("host"): str}, default=HOST_DEFAULT)
 
-DATA_SCHEMA = vol.Schema(
-    {vol.Required(f"{ConfName.HOST}", default=HOST_DEFAULT): str})
+DATA_SCHEMA = vol.Schema({vol.Required(f"{ConfName.HOST}", default=HOST_DEFAULT): str})
 
 
 async def validate_input(hass: HomeAssistant, data: dict) -> dict[str, Any]:
@@ -45,7 +45,7 @@ async def validate_input(hass: HomeAssistant, data: dict) -> dict[str, Any]:
     if len(data["host"]) < 3:
         raise InvalidHost
 
-   # Return info that you want to store in the config entry.
+    # Return info that you want to store in the config entry.
     # "Title" is what is displayed to the user for this hub device
     # It is stored internally in HA as part of the device config.
     # See `async_step_user` below for how this is used
@@ -117,6 +117,7 @@ class InvalidHost(exceptions.HomeAssistantError):
 
 class EnergyManagerOptionsFlowHandler(OptionsFlow):
     """Handle an options flow for SolarEdge Modbus Multi."""
+
     # when changing, change strings.json remember to copy to transalations and to refresh cache in safari cmd+R
 
     def __init__(self, config_entry: ConfigEntry):
@@ -143,11 +144,11 @@ class EnergyManagerOptionsFlowHandler(OptionsFlow):
         else:
             user_input = {
                 ConfName.POLLING_FREQUENCY: self.config_entry.options.get(
-                    ConfName.POLLING_FREQUENCY, ConfDefaultInt.POLLING_FREQUENCY),
+                    ConfName.POLLING_FREQUENCY, ConfDefaultInt.POLLING_FREQUENCY
+                ),
                 ConfName.MINIMUM_MARGIN: self.config_entry.options.get(
-                    ConfName.MINIMUM_MARGIN, ConfDefaultInt.MINIMUM_MARGIN),
-                ConfName.CHEAP_PRICE: self.config_entry.options.get(
-                    ConfName.CHEAP_PRICE, ConfDefaultInt.CHEAP_PRICE),
+                    ConfName.MINIMUM_MARGIN, ConfDefaultInt.MINIMUM_MARGIN
+                ),
             }
         data_schema = vol.Schema(
             {
@@ -158,13 +159,9 @@ class EnergyManagerOptionsFlowHandler(OptionsFlow):
                 vol.Optional(
                     f"{ConfName.MINIMUM_MARGIN}",
                     default=user_input[ConfName.MINIMUM_MARGIN],
-                ):  vol.Coerce(int),
-                vol.Optional(
-                    f"{ConfName.CHEAP_PRICE}",
-                    default=user_input[ConfName.CHEAP_PRICE],
-                ):  vol.Coerce(int),
-            })
+                ): vol.Coerce(int),
+            }
+        )
         return self.async_show_form(
-            step_id="init",
-            data_schema=data_schema, errors=errors
+            step_id="init", data_schema=data_schema, errors=errors
         )

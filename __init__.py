@@ -77,6 +77,3 @@ async def async_reload_entry(hass: HomeAssistant, entry: ConfigEntry) -> None:
     hub.minimum_margin = entry.options.get(
         ConfName.MINIMUM_MARGIN, ConfDefaultInt.MINIMUM_MARGIN
     )
-    hub.set_cheap_price(
-        entry.options.get(ConfName.CHEAP_PRICE, ConfDefaultInt.CHEAP_PRICE)
-    )
