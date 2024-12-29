@@ -31,8 +31,8 @@ class MyNumberEntity(NumberEntity):
         self._attr_min_value = min_value
         self._attr_max_value = max_value
         self._attr_step = step
+        self._attr_unique_id = id
         self.entity_id = id
-        self.attr_unique_id = id
 
         self._attr_mode = "box"  # Set mode to 'box' for text entry
         self._hub = hub
@@ -43,6 +43,7 @@ class MyNumberEntity(NumberEntity):
             "manufacturer": hub.manufacturer,
             "model": "Energy Manager",
         }
+        super().__init__()
 
         async_track_state_change(
             hub.hass,
@@ -54,11 +55,6 @@ class MyNumberEntity(NumberEntity):
     def device_info(self) -> dict:
         """Return device information about this entity."""
         return self._device_info
-
-    @property
-    def unique_id(self) -> str:
-        """Return a unique ID."""
-        return self.entity_id
 
     def set_native_value(self, value: float) -> None:
         """Set new value."""

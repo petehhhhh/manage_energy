@@ -30,12 +30,15 @@ class SolarCurtailmentSwitch(SwitchEntity):
 
     def __init__(self, name, id, title, hub):
         self._hub = hub
+        self.hass = hub._hass
         self.name = name
         self._icon = "mdi:power-plug"
         self._available = True
+        self._attr_unique_id = id
         self.entity_id = id
 
         self.enabled_by_default = True
+        super().__init__()
 
         self._hub.add_listener(self._on_hub_state_changed)
 
@@ -43,11 +46,6 @@ class SolarCurtailmentSwitch(SwitchEntity):
     def is_on(self):
         """Return true if switch is on."""
         return self._hub.curtailment
-
-    @property
-    def unique_id(self) -> str:
-        """Return a unique ID."""
-        return self.entity_id
 
     @property
     def available(self) -> bool:
@@ -85,13 +83,13 @@ class AutoSwitch(SwitchEntity):
     type = "Auto Power Management"
 
     def __init__(self, name, id, title, hub):
-        self.entity_id = id
         self._hub = hub
         self._state = self._hub.get_auto()
         self._name = title
         self._icon = "mdi:power-plug"
         self._available = True
-        self._unique_id = id
+        self._attr_unique_id = id
+        self.entity_id = id
         self._device_info = {
             "identifiers": {(DOMAIN, self._hub.hub_id)},
             "name": self._name,
@@ -99,17 +97,13 @@ class AutoSwitch(SwitchEntity):
             "model": "Energy Manager",
         }
         self.enabled_by_default = True
+        super().__init__()
 
         async_track_state_change(
             hub.hass,
             [self.entity_id],  # List of entities to monitor
             hub.refresh_on_state_change,  # Call the async refresh method whenever their state changes
         )
-
-    @property
-    def unique_id(self) -> str:
-        """Return a unique ID."""
-        return self.entity_id
 
     @property
     def device_info(self) -> dict:

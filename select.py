@@ -29,7 +29,7 @@ class BaseSelect(SelectEntity):
         self._hub = hub
         self._state = None
         self._attr_icon = "mdi:menu"
-        self._unique_id = id
+        self._attr_unique_id = id
         self._available = True
         self._enabled = True
         self._state = self._options[0]
@@ -41,6 +41,7 @@ class BaseSelect(SelectEntity):
             "manufacturer": self._hub.manufacturer,
             "model": "Energy Manager",
         }
+        super().__init__()
 
         async_track_state_change(
             hub.hass,
@@ -52,11 +53,6 @@ class BaseSelect(SelectEntity):
     def name(self) -> str:
         """Return the name of the select entity."""
         return self._name
-
-    @property
-    def unique_id(self) -> str:
-        """Return a unique ID."""
-        return self._unique_id
 
     @property
     def state(self) -> str:

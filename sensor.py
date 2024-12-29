@@ -37,14 +37,14 @@ SENSORS: dict[str, SensorEntityDescription] = {
     "history": SensorEntityDescription(
         key="manage-energy-history",
         translation_key="history",
-        name="History",
+        name="Manage Energy History",
         icon="mdi:gauge-low",
         entity_category=EntityCategory.DIAGNOSTIC,
     ),
     "forecast": SensorEntityDescription(
         key="manage-energy-forecast",
         translation_key="forecast",
-        name="Forecast",
+        name="Manage Energy Forecast",
         icon="mdi:gauge-low",
         entity_category=EntityCategory.DIAGNOSTIC,
     ),
