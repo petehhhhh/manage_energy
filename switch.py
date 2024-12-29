@@ -6,31 +6,16 @@ from homeassistant.core import callback
 from homeassistant.helpers.event import async_track_state_change
 
 
-SWITCHES: dict[str, SwitchEntityDescription] = {
-    "Curtailment": SwitchEntityDescription(
-        key="solar_curtailment",
-        name="Solar Curtailment",
-        icon="mdi:currency-usd",
-    ),
-    "Auto": SwitchEntityDescription(
-        key="manage_energy_auto",
-        name="Manage Energy Auto",
-        icon="mdi:currency-usd",
-    ),
-}
-
-
 async def async_setup_entry(hass, config_entry, async_add_entities):
+    """Set up switches dynamically based on the SWITCHES dictionary."""
     hub = hass.data[DOMAIN][config_entry.entry_id]
 
-    async_add_entities(
-        [
-            SolarCurtailmentSwitch(
-                SWITCHES["Curtailment"], EntityIDs.SOLAR_CURTAILMENT, hub
-            ),
-            AutoSwitch(SWITCHES["Auto"], EntityIDs.AUTO, hub),
-        ]
-    )
+    # Create entities by iterating over the SWITCHES dictionary
+    entities = [
+        entity_class(description, entity_id, hub)
+        for entity_class, description, entity_id in SWITCHES.values()
+    ]
+    async_add_entities(entities)
 
 
 class BaseSwitch(SwitchEntity):
@@ -118,3 +103,25 @@ class AutoSwitch(BaseSwitch):
     async def async_update(self):
         """Update the state of the switch."""
         self._state = self._hub.get_auto()
+
+
+SWITCHES: dict[str, tuple[type, SwitchEntityDescription, str]] = {
+    "Curtailment": (
+        SolarCurtailmentSwitch,
+        SwitchEntityDescription(
+            key="solar_curtailment",
+            name="Solar Curtailment",
+            icon="mdi:solar-power-variant-outline",
+        ),
+        EntityIDs.SOLAR_CURTAILMENT,
+    ),
+    "Auto": (
+        AutoSwitch,
+        SwitchEntityDescription(
+            key="manage_energy_auto",
+            name="Manage Energy Auto",
+            icon="mdi:head-lightbulb",
+        ),
+        EntityIDs.AUTO,
+    ),
+}

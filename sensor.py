@@ -16,7 +16,7 @@ from homeassistant.components.sensor import (
 from homeassistant.helpers.restore_state import RestoreEntity
 from homeassistant.helpers.entity import EntityCategory
 
-from .const import DOMAIN
+from .const import DOMAIN, EntityIDs
 
 from homeassistant.const import (
     ATTR_IDENTIFIERS,
@@ -26,50 +26,22 @@ from homeassistant.const import (
 )
 
 
-SENSORS: dict[str, SensorEntityDescription] = {
-    "status": SensorEntityDescription(
-        key="manage-energy-status",
-        translation_key="status",
-        name="Manage Energy Status",
-        icon="mdi:gauge-low",
-        entity_category=EntityCategory.DIAGNOSTIC,
-    ),
-    "history": SensorEntityDescription(
-        key="manage-energy-history",
-        translation_key="history",
-        name="Manage Energy History",
-        icon="mdi:gauge-low",
-        entity_category=EntityCategory.DIAGNOSTIC,
-    ),
-    "forecast": SensorEntityDescription(
-        key="manage-energy-forecast",
-        translation_key="forecast",
-        name="Manage Energy Forecast",
-        icon="mdi:gauge-low",
-        entity_category=EntityCategory.DIAGNOSTIC,
-    ),
-}
-
-
 async def async_setup_entry(hass, config_entry, async_add_entities):
-    """Add sensors for passed config_entry in HA."""
+    """Set up switches dynamically based on the SWITCHES dictionary."""
     hub = hass.data[DOMAIN][config_entry.entry_id]
 
-    async_add_entities(
-        [
-            StatusBase(SENSORS["status"], config_entry, hub),
-            HistoryBase(SENSORS["history"], config_entry, hub),
-            Forecast(SENSORS["forecast"], config_entry, hub),
-        ]
-    )
+    # Create entities by iterating over the SWITCHES dictionary
+    entities = [
+        entity_class(description, entity_id, hub)
+        for entity_class, description, entity_id in SENSORS.values()
+    ]
+    async_add_entities(entities)
 
 
 class SensorBase(SensorEntity, RestoreEntity):
     """SensorBase for Manage Energy."""
 
-    def __init__(
-        self, entity_description: SensorEntityDescription, config_entry, hub
-    ) -> None:
+    def __init__(self, entity_description: SensorEntityDescription, id, hub) -> None:
         """Initialize the sensor."""
         super().__init__()
         self._hub = hub
@@ -84,7 +56,9 @@ class SensorBase(SensorEntity, RestoreEntity):
             ATTR_MANUFACTURER: hub.manufacturer,
             ATTR_MODEL: "Energy Model",
         }
-        self._attr_unique_id = entity_description.key
+        self._attr_unique_id = id
+
+        self._hub.add_listener(self._on_hub_state_changed)
 
     @property
     def should_poll(self) -> bool:
@@ -115,33 +89,18 @@ class SensorBase(SensorEntity, RestoreEntity):
 class StatusBase(SensorBase):
     should_poll = False
 
-    def __init__(self, entity_description, config_entry, hub) -> None:
-        """Initialize the sensor."""
-
-        self._state = hub.state
-
-        super().__init__(entity_description, config_entry, hub)
-
-        self._hub.add_listener(self._on_hub_state_changed)
-
     @property
     def native_value(self) -> str:
         """Return the state of the entity."""
-        self._state = str(self._hub.state)
-        self._attributes["state"] = self._hub.state
-        return self._state
+        return str(self._hub.state)
 
 
 class HistoryBase(SensorBase, RestoreEntity):
-    def __init__(
-        self, entity_description: SensorEntityDescription, config_entry, hub
-    ) -> None:
+    def __init__(self, entity_description: SensorEntityDescription, id, hub) -> None:
         """Initialize the sensor."""
-
-        hub.forecasts.add_listener(self._on_hub_state_changed)
         self._state = None
-
-        super().__init__(entity_description, config_entry, hub)
+        hub.forecasts.add_listener(self._on_hub_state_changed)
+        super().__init__(entity_description, id, hub)
 
     def _on_hub_state_changed(self, new_state):
         """Handle when the hub's state changes."""
@@ -178,14 +137,8 @@ class HistoryBase(SensorBase, RestoreEntity):
         return self._attr_extra_state_attributes
 
 
-class Forecast(HistoryBase, SensorBase):
+class ForecastBase(HistoryBase, SensorBase):
     """The current forecast"""
-
-    def __init__(
-        self, entity_description: SensorEntityDescription, config_entry, hub
-    ) -> None:
-        self._unique_id = entity_description.key
-        super().__init__(entity_description, config_entry, hub)
 
     def _on_hub_state_changed(self, new_state):
         """Handle when the hub's state changes."""
@@ -211,3 +164,40 @@ class Forecast(HistoryBase, SensorBase):
         self._attr_extra_state_attributes["forecast"] = self._hub.forecasts.forecast
 
         return self._state
+
+
+SENSORS: dict[str, SensorEntityDescription] = {
+    "status": (
+        StatusBase,
+        SensorEntityDescription(
+            key="manage-energy-status",
+            translation_key="status",
+            name="Manage Energy Status",
+            icon="mdi:gauge-low",
+            entity_category=EntityCategory.DIAGNOSTIC,
+        ),
+        EntityIDs.STATUS,
+    ),
+    "history": (
+        HistoryBase,
+        SensorEntityDescription(
+            key="manage-energy-history",
+            translation_key="history",
+            name="Manage Energy History",
+            icon="mdi:gauge-low",
+            entity_category=EntityCategory.DIAGNOSTIC,
+        ),
+        EntityIDs.HISTORY,
+    ),
+    "forecast": (
+        ForecastBase,
+        SensorEntityDescription(
+            key="manage-energy-forecast",
+            translation_key="forecast",
+            name="Manage Energy Forecast",
+            icon="mdi:gauge-low",
+            entity_category=EntityCategory.DIAGNOSTIC,
+        ),
+        EntityIDs.FORECAST,
+    ),
+}

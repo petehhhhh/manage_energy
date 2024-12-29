@@ -10,36 +10,25 @@ from .const import EntityIDs
 
 
 async def async_setup_entry(hass, config_entry, async_add_entities):
-    """Set up number entities for the integration."""
+    """Set up switches dynamically based on the SWITCHES dictionary."""
     hub = hass.data[DOMAIN][config_entry.entry_id]
 
-    NUMBERS: dict[str, NumberEntityDescription] = {
-        "CheapGrid": NumberEntityDescription(
-            key="cheap_charge_price",
-            name="Cheap Charge Price",
-            icon="mdi:currency-usd",
-            native_max_value=100,
-            native_min_value=0,
-            native_step=1,
-            native_unit_of_measurement="c",
-        ),
-    }
-
-    async_add_entities(
-        [
-            BaseNumberEntity(NUMBERS["CheapGrid"], hub),
-        ]
-    )
+    # Create entities by iterating over the SWITCHES dictionary
+    entities = [
+        entity_class(description, entity_id, hub)
+        for entity_class, description, entity_id in NUMBERS.values()
+    ]
+    async_add_entities(entities)
 
 
-class BaseNumberEntity(RestoreNumber):
+class BaseNumberEntity(NumberEntity):
     """Representation of a custom number entity."""
 
-    def __init__(self, entity_description, hub):
+    def __init__(self, entity_description, id, hub):
         self.entity_description = entity_description
 
-        self.entity_id = EntityIDs.MAX_PRICE
-        self._attr_unique_id = self.entity_id
+        self.entity_id = id
+        self._attr_unique_id = id
 
         self._attr_mode = "box"  # Set mode to 'box' for text entry
         self._hub = hub
@@ -68,3 +57,20 @@ class BaseNumberEntity(RestoreNumber):
         self.native_value = int(value)
         self._hub.cheap_price = float(value) / 100
         self.async_write_ha_state
+
+
+NUMBERS: dict[str, NumberEntityDescription] = {
+    "CheapGrid": (
+        BaseNumberEntity,
+        NumberEntityDescription(
+            key="cheap_charge_price",
+            name="Cheap Charge Price",
+            icon="mdi:currency-usd",
+            native_max_value=100,
+            native_min_value=0,
+            native_step=1,
+            native_unit_of_measurement="c",
+        ),
+        EntityIDs.MAX_PRICE,
+    )
+}

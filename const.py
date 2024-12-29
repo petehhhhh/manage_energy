@@ -24,6 +24,9 @@ class EntityIDs(StrEnum):
     TESLA_MODE_SELECT = "select.manage_energy_tesla_mode"
     MAX_PRICE = "number.cheap_charge_price"
     AUTO = "switch.manage_energy_auto"
+    HISTORY = "sensor.manage_energy_history"
+    FORECAST = "sensor.manage_energy_forecast"
+    STATUS = "sensor.manage_energy_status"
 
 
 class PowerSelectOptions(StrEnum):
