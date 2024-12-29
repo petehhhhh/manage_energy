@@ -15,6 +15,7 @@ from homeassistant.components.recorder.history import state_changes_during_perio
 from homeassistant.helpers.event import async_track_time_interval, async_call_later
 from .utils import is_demand_window
 
+
 _LOGGER = logging.getLogger(__name__)
 
 
@@ -48,20 +49,20 @@ class TeslaCharging:
         # Turn Tesla charging on if the plugged in and at home.
         try:
             actuals = self._hub.forecasts.actuals
-            hass = self._hass
+            hass: HomeAssistant = self._hass
             hub = self._hub
 
             tesla_home = (
                 hass.states.get("binary_sensor.pete_s_tesla_presence").state == "on"
             )
-            max_price = self.get_max_price()
+            max_price = hub.cheap_price
 
             tesla_charger_door_closed = (
                 hass.states.get("cover.pete_s_tesla_via_fleet_charger_door").state
                 != "open"
             )
 
-            if tesla_charger_door_closed or not tesla_home:
+            if (tesla_charger_door_closed or not tesla_home) and not hass.config.debug:
                 return False
 
             tesla_charging = (

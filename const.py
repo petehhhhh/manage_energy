@@ -16,6 +16,16 @@ MAX_BATTERY_LEVEL = 99
 DEMAND_SCALE_UP = 30 * 5 * 0.3 / 8
 
 
+class EntityIDs(StrEnum):
+    """Entity IDs to be used when registring"""
+
+    SOLAR_CURTAILMENT = "switch.solar_curltailment"
+    MODE_SELECT = "select.manage_energy_power_mode"
+    TESLA_MODE_SELECT = "select.manage_energy_tesla_mode"
+    MAX_PRICE = "number.cheap_charge_price"
+    AUTO = "switch.manage_energy_auto"
+
+
 class PowerSelectOptions(StrEnum):
     """Power select options."""
 

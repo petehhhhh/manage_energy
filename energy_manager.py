@@ -30,7 +30,6 @@ class manage_energy:
         host: str,
         poll_frequency: int,
         minimum_margin: int,
-        cheap_price: int,
     ) -> None:
         self._hass = hass
         self._state = ""
@@ -42,7 +41,7 @@ class manage_energy:
         self._name = host
         self._poll_frequency = int(poll_frequency)
         self.minimum_margin = float(minimum_margin) / 100
-        self.cheap_price = cheap_price / 100
+        self.cheap_price = 0
         self.manufacturer = "Pete"
         self._locked = False
         self._curtailment = False
@@ -65,8 +64,15 @@ class manage_energy:
         )
         self.forecasts = Forecasts(self)
 
-    def setcheap_price(self, value):
-        self.cheap_price = value / 100
+    @property
+    def cheap_price(self) -> str:
+        """Current state of Manage Energy."""
+        return self._cheap_price
+
+    @cheap_price.setter
+    def cheap_price(self, value: float):
+        """property to set the cheap price in cents we should charge from Grid"""
+        self._cheap_price = value
 
     def add_listener(self, callback):
         """Add a listener that will be notified when the state changes."""
@@ -214,6 +220,10 @@ class manage_energy:
             await self.maximise_self()
 
         return False
+
+    async def refresh_on_state_change(self, *args):
+        """Method called when entity states change"""
+        await self.handle_manage_energy()
 
     async def handle_manage_energy(self):
         """Maing method in Manage_Energy."""
