@@ -1,7 +1,6 @@
 from .const import (
     BATTERY_DISCHARGE_RATE,
     BATTERY_CHARGE_RATE,
-    REDUCED_CHARGE_RATE,
     PowerSelectOptions,
     TeslaModeSelectOptions,
     DEMAND_SCALE_UP,
