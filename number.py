@@ -60,7 +60,7 @@ class BaseNumberEntity(RestoreNumber):
         # Attempt to restore the last known state
         last_state = await self.async_get_last_number_data()
         if last_state and last_state.native_value not in (None, "unknown"):
-            self._attr_native_value = round(float(last_state.native_value))
+            self._attr_native_value = float(last_state.native_value)
         else:
             # Write the current state if no previous state exists
             self._attr_native_value = self._hub.cheap_price
@@ -68,12 +68,9 @@ class BaseNumberEntity(RestoreNumber):
         # Ensure the state is written to Home Assistant
         self.async_write_ha_state()
 
-    def _schedule_immediate_update(self):
-        self.async_schedule_update_ha_state(True)
-
     async def async_set_native_value(self, value: float) -> None:
         """Set new value."""
-        self._attr_native_value = round(value)
+        self._attr_native_value = value
 
         self._hub.cheap_price = value  # Update the hub value
         self.async_write_ha_state()
@@ -92,12 +89,12 @@ NUMBERS: dict[str, NumberEntityDescription] = {
             device_class=NumberDeviceClass.MONETARY,
             name="Cheap Charge Price",
             icon="mdi:currency-usd",
-            native_max_value=100,
+            native_max_value=1,
             native_min_value=0,
-            native_step=1,
-            step=1,
+            native_step=0.01,
+            step=0.01,
             mode="box",
-            native_unit_of_measurement="c",
+            native_unit_of_measurement="$",
         ),
         EntityIDs.MAX_PRICE,
     )

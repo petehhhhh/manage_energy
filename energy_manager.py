@@ -41,7 +41,7 @@ class manage_energy:
         self._name = host
         self._poll_frequency = int(poll_frequency)
         self.minimum_margin = float(minimum_margin) / 100
-        self.cheap_price = 4
+        self.cheap_price = 0.04
         self.manufacturer = "Pete"
         self._locked = False
         self._curtailment = False
