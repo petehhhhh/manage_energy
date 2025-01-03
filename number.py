@@ -61,6 +61,7 @@ class BaseNumberEntity(RestoreNumber):
         last_state = await self.async_get_last_number_data()
         if last_state and last_state.native_value not in (None, "unknown"):
             self._attr_native_value = float(last_state.native_value)
+            self._hub.cheap_price = self._attr_native_value
         else:
             # Write the current state if no previous state exists
             self._attr_native_value = self._hub.cheap_price
