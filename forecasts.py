@@ -479,9 +479,12 @@ class Forecasts:
         ff.solar = self.solar[i:]
         ff.net = self.net[i:]
         ff.consumption = ff.consumption[i:]
-        ff.battery_energy, ff.grid, ff.battery_pct, ff.battery_charge_rate = (
-            self.forecast_battery_and_grid(ff)
-        )
+        (
+            ff.battery_energy,
+            ff.battery_pct,
+            ff.battery_charge_rate,
+            ff.grid,
+        ) = self.forecast_battery_and_grid(ff)
         return ff
 
     def format_date(self, std1):

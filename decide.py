@@ -58,6 +58,7 @@ class Decide:
             lambda: MaximiseUsage(
                 f, 4, PowerSelectOptions.MAXIMISE, "Maximising usage"
             ),
+            lambda: MaximiseUsage(f, 4, PowerSelectOptions.CHARGE, "Maximising usage"),
         ]
         # and will run one by one, stopping when the first is successful. The last maximise usage should always be successful.
         for i, rule in enumerate(self.rules):
@@ -140,19 +141,8 @@ class Should_i_charge_as_not_enough_solar(baseRule):
     def eval(self):
         """Eval rule for this one."""
         actuals = self.actuals
-        FORECAST_WINDOW = 24
-        # half an hour blocks it will take to charge...
-        blocks_to_charge = (
-            int(
-                round(
-                    (1 - (actuals.battery_pct / 100))
-                    * actuals.battery_max_usable_energy
-                    / BATTERY_CHARGE_RATE,
-                    0,
-                )
-            )
-            * 2
-        )
+        FORECAST_WINDOW = len(self.forecast.battery_energy) - 1
+
         # If my battery level is not going to hit 100... or i am going to be importing power before it does
         # and power cheap now. Top up..
         battery_charged = next(
@@ -167,7 +157,9 @@ class Should_i_charge_as_not_enough_solar(baseRule):
             (
                 i
                 for i, num in enumerate(self.forecast.grid[0:FORECAST_WINDOW])
-                if num < 0
+                if num > 0
+                and i < len(self.forecast.action)
+                and self.forecast.action[i] != PowerSelectOptions.CHARGE
             ),
             None,
         )
@@ -197,10 +189,10 @@ class Should_i_charge_as_not_enough_solar(baseRule):
 
         blocks = self.forecast.amber_scaled_price[0 : blocks_to_check - 1]
 
-        if len(blocks) < 1 or blocks_to_charge == 0:
+        if len(blocks) < 1:
             return False
 
-        blocks_to_check = sorted(blocks)[0:blocks_to_charge]
+        blocks_to_check = sorted(blocks)[0:3]
 
         if len(blocks_to_check) == 1:
             val = blocks_to_check[0]
