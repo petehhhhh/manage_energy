@@ -6,7 +6,7 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from .energy_manager import manage_energy
 from .const import DOMAIN, ConfName, ConfDefaultInt
-from homeassistant.helpers.event import async_track_state_change
+from homeassistant.helpers.event import async_track_state_change_event
 
 # List of platforms to support. There should be a matching .py file for each,
 # eg <cover.py> and <sensor.py>
@@ -41,7 +41,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     entry.async_on_unload(entry.add_update_listener(async_reload_entry))
 
-    async_track_state_change(
+    async_track_state_change_event(
         hass,
         ["sensor.energy_usage", "sensor.price"],  # List of entities to monitor
         hub.refresh,  # Call the async refresh method whenever their state changes

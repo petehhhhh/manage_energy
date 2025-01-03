@@ -1,4 +1,8 @@
-from homeassistant.components.switch import SwitchEntity, SwitchEntityDescription
+from homeassistant.components.switch import (
+    SwitchEntity,
+    SwitchEntityDescription,
+    ENTITY_ID_FORMAT,
+)
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from .const import DOMAIN, EntityIDs
@@ -23,8 +27,7 @@ class BaseSwitch(SwitchEntity):
         self._hub = hub
         self.hass = hub._hass
         self.entity_description = entity_description
-        self.entity_id = id
-        self._attr_unique_id = self.entity_id
+        self._attr_unique_id = id.replace(ENTITY_ID_FORMAT, "")
 
         self._device_info = {
             "identifiers": {(DOMAIN, self._hub.hub_id)},

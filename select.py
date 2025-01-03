@@ -1,5 +1,5 @@
 from .const import DOMAIN, PowerSelectOptions, TeslaModeSelectOptions, EntityIDs
-from homeassistant.components.select import SelectEntity
+from homeassistant.components.select import SelectEntity, ENTITY_ID_FORMAT
 from .energy_manager import manage_energy
 from homeassistant.core import callback
 from homeassistant.helpers.event import async_track_state_change
@@ -29,7 +29,8 @@ class BaseSelect(SelectEntity):
         self._hub = hub
         self._state = None
         self._attr_icon = "mdi:menu"
-        self._attr_unique_id = id
+        self._attr_unique_id = id.replace(ENTITY_ID_FORMAT, "")
+
         self._available = True
         self._enabled = True
         self._state = self._options[0]

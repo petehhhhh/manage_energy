@@ -2,6 +2,7 @@ from homeassistant.components.number import (
     NumberEntity,
     NumberEntityDescription,
     RestoreNumber,
+    ENTITY_ID_FORMAT,
 )
 from homeassistant.const import CONF_NAME
 from homeassistant.components.number.const import NumberDeviceClass
@@ -29,7 +30,7 @@ class BaseNumberEntity(RestoreNumber):
         self.entity_description = entity_description
 
         # Assign unique ID for entity registry
-        self._attr_unique_id = unique_id
+        self._attr_unique_id = unique_id.replace(ENTITY_ID_FORMAT, "")
         self._attr_name = entity_description.name
 
         # Set initial value
