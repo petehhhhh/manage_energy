@@ -265,8 +265,9 @@ class ShouldIChargeforPriceSpike(baseRule):
                 )
                 or self.a.charge_blocks_required_for_peak > self.a.start_high_prices
             )
-            #If battery never hits peak before start of high prices...
-            and safe_max(self.battery_pct[0:self.a.start_high_prices]) < MAX_BATTERY_LEVEL
+            # If battery never hits peak before start of high prices...
+            and safe_max(self.forecast.battery_pct[0 : self.a.start_high_prices])
+            < MAX_BATTERY_LEVEL
         ):
             return True
 

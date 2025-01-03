@@ -10,7 +10,7 @@ from .const import (
 import logging
 import datetime
 import traceback
-
+from homeassistant.helpers.storage import Store
 from homeassistant.core import HomeAssistant, StateMachine  # type: ignore
 from homeassistant.components.recorder import get_instance  # type: ignore
 from homeassistant.components.recorder.history import state_changes_during_period  # type: ignore
@@ -41,7 +41,7 @@ class manage_energy:
         self._name = host
         self._poll_frequency = int(poll_frequency)
         self.minimum_margin = float(minimum_margin) / 100
-        self.cheap_price = 0
+        self.cheap_price = 4
         self.manufacturer = "Pete"
         self._locked = False
         self._curtailment = False
@@ -73,6 +73,14 @@ class manage_energy:
     def cheap_price(self, value: float):
         """property to set the cheap price in cents we should charge from Grid"""
         self._cheap_price = value
+
+    async def load_cheap_price(self):
+        """Load state from storage"""
+        data = await self._storage.async_load()
+        if data is not None:
+            self._state = data
+        else:
+            self._state = {}  # Default state if no data exists
 
     def add_listener(self, callback):
         """Add a listener that will be notified when the state changes."""
