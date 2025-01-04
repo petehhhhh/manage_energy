@@ -192,15 +192,10 @@ class Should_i_charge_as_not_enough_solar(baseRule):
         if len(blocks) < 1:
             return False
 
-        blocks_to_check = sorted(blocks)[0:3]
-
-        if len(blocks_to_check) == 1:
-            val = blocks_to_check[0]
-        else:
-            val = max(blocks_to_check)
+        val = largest_entry(blocks, 3)
 
         # check whether a better time to charge. Should really work out how many blocks we need mim but on future iterations, should then eliminate export and never hit here. We will see...
-        if self.actuals.scaled_price < val:
+        if val is not None and self.actuals.scaled_price <= val:
             return True
 
         return False
@@ -210,6 +205,12 @@ class ShouldIDischarge(baseRule):
     """If i have available energy and the actual is as good as it gets in the next five hours (with margin) or there is a price spike in the next 5 hours and this is one of the best opportunities."""
 
     def eval(self):
+        if self.a.point_battery_empty is None:
+            battery_window = len(self.a.next12hours) - 1
+        else:
+            battery_window = min(
+                self.a.point_battery_empty, len(self.a.next12hours) - 1
+            )
         if (
             self.actuals.available_battery_energy > self.actuals.battery_min_energy
         ) and (
@@ -227,7 +228,7 @@ class ShouldIDischarge(baseRule):
                 and len(self.a.available_max_values) > 0
                 and self.actuals.feedin >= 0.9 * min(self.a.available_max_values)
                 and self.a.has_sufficient_margin(
-                    self.actuals.feedin, min(self.a.next12hours[0:10])
+                    self.actuals.feedin, min(self.a.next12hours[:battery_window])
                 )
             )
         ):

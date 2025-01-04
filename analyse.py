@@ -31,6 +31,8 @@ class Analysis:
         self.next12hours = []
         self.charge_blocks_required_for_peak = 0
 
+        self.point_battery_empty = None
+
         # scaled minimum margin to avoid eg charging at $15 when it is forecast to be $15.50... High risk of disappointment...
         if actuals.feedin > 0.5:
             self.scaled_min_margin = self._minimum_margin / 0.20 * actuals.feedin
@@ -143,6 +145,17 @@ class Analysis:
         ):
             self.available_max_values.append(self.actuals.feedin)
 
+    def find_first_point_battery_empty(self):
+        """Finds the first point the battery is empty"""
+        return next(
+            (
+                i
+                for i, value in enumerate(self.forecasts.battery_energy)
+                if value <= self.actuals.battery_min_energy
+            ),
+            None,
+        )
+
     def analyze_price_peaks(self):
         """Analyse forecast and actual data for peak prices for deciding whethre to discharge/charge."""
         TTL_FORECAST_BLOCKS = 24
@@ -166,6 +179,8 @@ class Analysis:
         self.find_start_and_end_high_prices()
 
         self.available_max_values = None
+
+        self.point_battery_empty = self.find_first_point_battery_empty()
 
         # if we didn't find one then check that the current price is the tail of the peak
         if self.end_high_prices is None:
