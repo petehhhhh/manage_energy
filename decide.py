@@ -205,31 +205,30 @@ class ShouldIDischarge(baseRule):
     """If i have available energy and the actual is as good as it gets in the next five hours (with margin) or there is a price spike in the next 5 hours and this is one of the best opportunities."""
 
     def eval(self):
+        if self.actuals.available_battery_energy >= self.actuals.battery_min_energy:
+            return False
+
         if self.a.point_battery_empty is None:
             battery_window = len(self.a.next12hours) - 1
         else:
             battery_window = min(
                 self.a.point_battery_empty, len(self.a.next12hours) - 1
             )
-        if (
-            self.actuals.available_battery_energy > self.actuals.battery_min_energy
-        ) and (
-            (
-                # if it is currently 90% of the maximum forecsated and there is acceptable margin then take it !
-                self.actuals.feedin
-                >= (
-                    0.9
-                    * float(max(self.a.next12hours[0:10]) + self.a.scaled_min_margin)
-                )
-            )
-            or (
-                # otherwise if it is moire than the max values (that already are calced with minimum margin)
-                self.a.available_max_values is not None
-                and len(self.a.available_max_values) > 0
-                and self.actuals.feedin >= 0.9 * min(self.a.available_max_values)
-                and self.a.has_sufficient_margin(
-                    self.actuals.feedin, min(self.a.next12hours[:battery_window])
-                )
+
+        if self.a.has_sufficient_margin(
+            self.actuals.feedin,
+            0.9
+            * float(
+                max(self.a.forecast.amber_price[0:battery_window])
+                + self.a.scaled_min_margin
+            ),
+        ) or (
+            # otherwise if it is more than the max values (that already are calced with minimum margin)
+            self.a.available_max_values is not None
+            and len(self.a.available_max_values) > 0
+            and self.actuals.feedin >= 0.9 * min(self.a.available_max_values)
+            and self.a.has_sufficient_margin(
+                self.actuals.feedin, min(self.forecast.amber_price[0:battery_window])
             )
         ):
             return True
