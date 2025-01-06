@@ -2,7 +2,7 @@ from .const import DOMAIN, PowerSelectOptions, TeslaModeSelectOptions, EntityIDs
 from homeassistant.components.select import SelectEntity, ENTITY_ID_FORMAT
 from .energy_manager import manage_energy
 from homeassistant.core import callback
-from homeassistant.helpers.event import async_track_state_change
+from homeassistant.helpers.event import async_track_state_change_event
 
 
 async def async_setup_entry(hass, config_entry, async_add_entities):
@@ -44,7 +44,7 @@ class BaseSelect(SelectEntity):
         }
         super().__init__()
 
-        async_track_state_change(
+        async_track_state_change_event(
             hub.hass,
             [self.entity_id],  # List of entities to monitor
             hub.refresh_on_state_change,  # Call the async refresh method whenever their state changes

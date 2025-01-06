@@ -30,7 +30,7 @@ class Analysis:
         self._minimum_margin = hub.minimum_margin
         self.next12hours = []
         self.charge_blocks_required_for_peak = 0
-
+        self.battery_window = None
         self.point_battery_empty = None
 
         # scaled minimum margin to avoid eg charging at $15 when it is forecast to be $15.50... High risk of disappointment...
@@ -111,6 +111,13 @@ class Analysis:
 
         self.find_end_high_prices()
 
+    def is_battery_empty(self):
+        """Check if battery has power available."""
+        if self.actuals.available_battery_energy <= self.actuals.battery_min_energy:
+            return True
+
+        return False
+
     def has_sufficient_margin(self, value: float, baseline: float) -> bool:
         """Check if the value has sufficient margin."""
         return value >= (baseline + self._minimum_margin)
@@ -155,6 +162,15 @@ class Analysis:
             ),
             None,
         )
+
+    def getBatteryWindow(self):
+        """Works out when battery is next empty or None if it is not forecast to empty"""
+        if self.point_battery_empty is None:
+            battery_window = len(self.next12hours) - 1
+        else:
+            battery_window = min(self.point_battery_empty, len(self.next12hours) - 1)
+
+        return battery_window
 
     def analyze_price_peaks(self):
         """Analyse forecast and actual data for peak prices for deciding whethre to discharge/charge."""
@@ -206,7 +222,7 @@ class Analysis:
                 )
                 + 1
             )
-
+            self.battery_window = self.getBatteryWindow()
             self.battery_at_peak = forecasts.battery_energy[self.start_high_prices]
             self.peak_start_time = forecasts.start_time[self.start_high_prices]
             self.peak_start_time = forecasts.format_date(self.peak_start_time)

@@ -40,8 +40,8 @@ class Decide:
             lambda: ChargeInNegativePrices(
                 f, 0, PowerSelectOptions.CHARGE, "Charging. Negative Prices."
             ),
-            lambda: ShouldIDischarge(
-                f, 1, PowerSelectOptions.DISCHARGE, "Discharging into Price Spike"
+            lambda: ShouldIDischarge_No_Regrets(
+                f, 1, PowerSelectOptions.DISCHARGE, "Discharging as No Regrets"
             ),
             lambda: Should_i_charge_as_not_enough_solar(
                 f, 2, PowerSelectOptions.CHARGE, "Charging as cheaper now"
@@ -55,10 +55,12 @@ class Decide:
             # lambda: PreserveWhileTeslaCharging(
             #    f, PowerSelectOptions.OFF, "Preserving charge"
             # ),
-            lambda: MaximiseUsage(
-                f, 4, PowerSelectOptions.MAXIMISE, "Maximising usage"
+            lambda: ShouldIDischarge_in_Spike(
+                f, 4, PowerSelectOptions.DISCHARGE, "Discharging into Price Spike"
             ),
-            lambda: MaximiseUsage(f, 4, PowerSelectOptions.CHARGE, "Maximising usage"),
+            lambda: MaximiseUsage(
+                f, 5, PowerSelectOptions.MAXIMISE, "Maximising usage"
+            ),
         ]
         # and will run one by one, stopping when the first is successful. The last maximise usage should always be successful.
         for i, rule in enumerate(self.rules):
@@ -201,34 +203,41 @@ class Should_i_charge_as_not_enough_solar(baseRule):
         return False
 
 
-class ShouldIDischarge(baseRule):
+class ShouldIDischarge_No_Regrets(baseRule):
     """If i have available energy and the actual is as good as it gets in the next five hours (with margin) or there is a price spike in the next 5 hours and this is one of the best opportunities."""
 
     def eval(self):
-        if self.actuals.available_battery_energy >= self.actuals.battery_min_energy:
+        if self.a.is_battery_empty():
             return False
-
-        if self.a.point_battery_empty is None:
-            battery_window = len(self.a.next12hours) - 1
-        else:
-            battery_window = min(
-                self.a.point_battery_empty, len(self.a.next12hours) - 1
-            )
 
         if self.a.has_sufficient_margin(
             self.actuals.feedin,
             0.9
             * float(
-                max(self.a.forecast.amber_price[0:battery_window])
+                max(self.forecast.amber_price[0 : self.a.battery_window])
                 + self.a.scaled_min_margin
             ),
-        ) or (
-            # otherwise if it is more than the max values (that already are calced with minimum margin)
+        ):
+            return True
+
+        return False
+
+
+class ShouldIDischarge_in_Spike(baseRule):
+    """If i have available energy and the actual is as good as it gets in the next five hours (with margin) or there is a price spike in the next 5 hours and this is one of the best opportunities."""
+
+    def eval(self):
+        if self.a.is_battery_empty():
+            return False
+
+        if (
+            # This is the time with one of the best prices and has sufficient marging
             self.a.available_max_values is not None
             and len(self.a.available_max_values) > 0
             and self.actuals.feedin >= 0.9 * min(self.a.available_max_values)
             and self.a.has_sufficient_margin(
-                self.actuals.feedin, min(self.forecast.amber_price[0:battery_window])
+                self.actuals.feedin,
+                min(self.forecast.amber_price[0 : self.a.battery_window]),
             )
         ):
             return True
