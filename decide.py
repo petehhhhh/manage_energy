@@ -143,7 +143,12 @@ class Should_i_charge_as_not_enough_solar(baseRule):
     def eval(self):
         """Eval rule for this one."""
         actuals = self.actuals
-        FORECAST_WINDOW = len(self.forecast.battery_energy) - 1
+
+        if min(self.forecast.battery_energy) > self.actuals.battery_min_energy * 1.3:
+            # if battery is not going to be empty (with a safety margin) in the next forecast window, then don't charge
+            return False
+
+        forecast_window = len(self.forecast.battery_energy) - 1
 
         # If my battery level is not going to hit 100... or i am going to be importing power before it does
         # and power cheap now. Top up..
@@ -158,10 +163,8 @@ class Should_i_charge_as_not_enough_solar(baseRule):
         firstgridimport = next(
             (
                 i
-                for i, num in enumerate(self.forecast.grid[0:FORECAST_WINDOW])
+                for i, num in enumerate(self.forecast.grid[0:forecast_window])
                 if num > 0
-                and i < len(self.forecast.action)
-                and self.forecast.action[i] != PowerSelectOptions.CHARGE
             ),
             None,
         )
@@ -178,14 +181,14 @@ class Should_i_charge_as_not_enough_solar(baseRule):
         if battery_charged is None or firstgridimport < battery_charged:
             first_no_grid_export = None
             for i, num in enumerate(self.forecast.grid):
-                if num >= 0 and i > firstgridimport:
+                if num <= 0 and i > firstgridimport:
                     first_no_grid_export = i
                     break
 
         # else check for the blocks up to when it will be charged or for the entire window.
 
         if battery_charged is None or first_no_grid_export is None:
-            blocks_to_check = FORECAST_WINDOW
+            blocks_to_check = forecast_window
         else:
             blocks_to_check = first_no_grid_export
 
@@ -194,7 +197,22 @@ class Should_i_charge_as_not_enough_solar(baseRule):
         if len(blocks) < 1:
             return False
 
-        val = largest_entry(blocks, 3)
+        blocks_to_charge = int(
+            round(
+                (
+                    self.actuals.battery_max_energy
+                    - safe_max(self.forecast.battery_energy[:blocks_to_check])
+                )
+                / BATTERY_CHARGE_RATE
+                * 2
+                + 0.5,
+                0,
+            )
+        )
+        if blocks_to_charge == 0:
+            return False
+
+        val = largest_entry(blocks, blocks_to_charge)
 
         # check whether a better time to charge. Should really work out how many blocks we need mim but on future iterations, should then eliminate export and never hit here. We will see...
         if val is not None and self.actuals.scaled_price <= val:
@@ -204,7 +222,7 @@ class Should_i_charge_as_not_enough_solar(baseRule):
 
 
 class ShouldIDischarge_No_Regrets(baseRule):
-    """If i have available energy and the actual is as good as it gets in the next five hours (with margin) or there is a price spike in the next 5 hours and this is one of the best opportunities."""
+    """If i have available energy and actual is as good as it gets in the next five hours (with margin) or there is a price spike in the next 5 hours and this is one of the best opportunities."""
 
     def eval(self):
         if self.a.is_battery_empty():

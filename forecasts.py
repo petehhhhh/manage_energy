@@ -193,7 +193,6 @@ class Forecasts:
         # current energy in battery is the level of the battery less the unusable energy circa 10%
 
         battery_energy_level = f.actuals.available_battery_energy
-        start_time = datetime.now()
         battery_forecast = []
         pct_forecast = []
         battery_charge_rate_forecast = []
@@ -205,13 +204,18 @@ class Forecasts:
             )
 
             battery_forecast.append(battery_energy_level)
-            pct_forecast.append(battery_pct)
+
             battery_charge_rate_forecast.append(battery_charge_rate)
             grid_forecast.append(grid)
+            if i == len(f.net) - 1:
+                end_time = f.start_time[i] + timedelta(minutes=30)
+            else:
+                end_time = f.start_time[i + 1]
             battery_energy_level = self.calc_battery_energy(
-                battery_energy_level, battery_charge_rate, start_time, f.start_time[i]
+                battery_energy_level, battery_charge_rate, f.start_time[i], end_time
             )
-            start_time = f.start_time[i]
+            battery_pct = self.calc_battery_percent(battery_energy_level)
+            pct_forecast.append(battery_pct)
 
         return (
             battery_forecast,
