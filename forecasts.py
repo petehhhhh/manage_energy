@@ -186,8 +186,8 @@ class Forecasts:
 
         return consumption, solar
 
-    def calc_battery_percent(self, battery_energy_level: float) -> float:
-        return battery_energy_level / self.actuals.battery_max_energy * 100
+    def calc_battery_percent(self, battery_energy_level: float) -> int:
+        return int(battery_energy_level / self.actuals.battery_max_energy * 100)
 
     def forecast_battery_and_grid(self, f):
         # current energy in battery is the level of the battery less the unusable energy circa 10%
@@ -199,7 +199,7 @@ class Forecasts:
         grid_forecast = []
         for i, forecast_net_energy in enumerate(f.net):
             # assume battery is charged at 5kw and discharged at 5kw and calc based on net energy upto 5kw for a half hour period ie KWH = KW/2
-            battery_pct, battery_charge_rate, grid = self.calc_battery_and_grid(
+            battery_charge_rate, grid = self.calc_battery_and_grid(
                 battery_energy_level, forecast_net_energy
             )
 
@@ -231,7 +231,6 @@ class Forecasts:
         action=PowerSelectOptions.MAXIMISE,
     ):
         # assume battery is charged at 5kw and discharged at 5kw and calc based on net energy upto 5kw for a half hour period ie KWH = KW/2
-        battery_pct = self.calc_battery_percent(battery_energy_level)
 
         battery_charge_rate = self.calc_battery_charge_rate(
             net_energy, battery_energy_level, action
@@ -247,7 +246,7 @@ class Forecasts:
         elif battery_energy_level < self.actuals.battery_min_energy:
             battery_energy_level = self.actuals.battery_min_energy
 
-        return (int(battery_pct), battery_charge_rate, grid)
+        return (battery_charge_rate, grid)
 
     def store_forecast(self):
         """Store the forecast for use in a sensor."""
@@ -374,9 +373,8 @@ class Forecasts:
             ff.analysis.analyze_price_peaks()
             decision = Decide(ff)
             a.rule = decision.rule
-
             a.action = decision.rule.action
-            a.battery_pct, a.battery_charge_rate, a.grid = self.calc_battery_and_grid(
+            a.battery_charge_rate, a.grid = self.calc_battery_and_grid(
                 a.available_battery_energy, a.net_energy, a.action
             )
 
@@ -429,6 +427,7 @@ class Forecasts:
             start_time,
             self.start_time[i],
         )
+        a.battery_pct = self.calc_battery_percent(a.available_battery_energy)
 
         a.scaled_price = self.amber_scaled_price[i]
         a.price = self.amber_price[i]
@@ -438,7 +437,7 @@ class Forecasts:
         a.consumption = self.consumption[i]
         a.net_energy = a.solar - a.consumption
 
-        (a.battery_pct, a.battery_charge_rate, a.grid) = self.calc_battery_and_grid(
+        (a.battery_charge_rate, a.grid) = self.calc_battery_and_grid(
             a.available_battery_energy, a.net_energy
         )
 
