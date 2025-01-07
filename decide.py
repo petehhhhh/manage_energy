@@ -16,11 +16,13 @@ _LOGGER = logging.getLogger(__name__)
 
 def largest_entry(block, no_of_entry) -> float:
     """Returns the max value from block across the three lowest elements in an array"""
+
+    block = sorted(block)
     if len(block) == 0:
         return None
     if len(block) == 1 or no_of_entry <= 1:
         return block[0]
-    return max(sorted(block)[0:no_of_entry])
+    return max(block[0:no_of_entry])
 
 
 class Decide:
@@ -178,21 +180,7 @@ class Should_i_charge_as_not_enough_solar(baseRule):
         ):
             return False
 
-        if battery_charged is None or firstgridimport < battery_charged:
-            first_no_grid_export = None
-            for i, num in enumerate(self.forecast.grid):
-                if num <= 0 and i > firstgridimport:
-                    first_no_grid_export = i
-                    break
-
-        # else check for the blocks up to when it will be charged or for the entire window.
-
-        if battery_charged is None or first_no_grid_export is None:
-            blocks_to_check = forecast_window
-        else:
-            blocks_to_check = first_no_grid_export
-
-        blocks = self.forecast.amber_scaled_price[0 : blocks_to_check - 1]
+        blocks = self.forecast.amber_scaled_price[0 : forecast_window - 1]
 
         if len(blocks) < 1:
             return False
@@ -201,7 +189,7 @@ class Should_i_charge_as_not_enough_solar(baseRule):
             round(
                 (
                     self.actuals.battery_max_energy
-                    - safe_max(self.forecast.battery_energy[:blocks_to_check])
+                    - safe_max(self.forecast.battery_energy[:forecast_window])
                 )
                 / BATTERY_CHARGE_RATE
                 * 2
