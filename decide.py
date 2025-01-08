@@ -154,11 +154,20 @@ class Should_i_charge_as_not_enough_solar(baseRule):
 
         # If my battery level is not going to hit 100... or i am going to be importing power before it does
         # and power cheap now. Top up..
-        battery_charged = next(
+        battery_full = next(
             (
                 i
                 for i, num in enumerate(self.forecast.battery_energy)
                 if num >= self.actuals.battery_max_energy
+            ),
+            None,
+        )
+
+        battery_empty = next(
+            (
+                i
+                for i, num in enumerate(self.forecast.battery_energy)
+                if num <= self.actuals.battery_min_energy
             ),
             None,
         )
@@ -171,12 +180,21 @@ class Should_i_charge_as_not_enough_solar(baseRule):
             None,
         )
 
+        first_net_positive = next(
+            (
+                i
+                for i, num in enumerate(self.forecast.net[0:forecast_window])
+                if num >= 0
+            ),
+            None,
+        )
+
         # if battery will be charged before we next import power, don't charge
 
         if firstgridimport is None or (
-            (battery_charged is not None and firstgridimport > battery_charged)
+            (battery_full is not None and firstgridimport > battery_full)
             or actuals.battery_pct >= MAX_BATTERY_LEVEL
-            or is_demand_window(datetime.datetime.now())
+            or is_demand_window(actuals.time)
         ):
             return False
 
@@ -200,10 +218,15 @@ class Should_i_charge_as_not_enough_solar(baseRule):
         if blocks_to_charge == 0:
             return False
 
-        val = largest_entry(blocks, blocks_to_charge)
+        blocks_to_check = blocks[: max(firstgridimport, 24)]
+        val = largest_entry(blocks_to_check, blocks_to_charge)
 
-        # check whether a better time to charge. Should really work out how many blocks we need mim but on future iterations, should then eliminate export and never hit here. We will see...
-        if val is not None and self.actuals.scaled_price <= val:
+        # this is one of the cheapest times and has at least ~10% saving on max
+        if (
+            val is not None
+            and self.actuals.scaled_price <= val
+            and self.actuals.scaled_price < 0.9 * max(blocks_to_check)
+        ):
             return True
 
         return False
