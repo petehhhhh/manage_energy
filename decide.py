@@ -146,10 +146,6 @@ class Should_i_charge_as_not_enough_solar(baseRule):
         """Eval rule for this one."""
         actuals = self.actuals
 
-        if min(self.forecast.battery_energy) > self.actuals.battery_min_energy * 1.3:
-            # if battery is not going to be empty (with a safety margin) in the next forecast window, then don't charge
-            return False
-
         forecast_window = len(self.forecast.battery_energy) - 1
 
         # If my battery level is not going to hit 100... or i am going to be importing power before it does
@@ -189,6 +185,18 @@ class Should_i_charge_as_not_enough_solar(baseRule):
             None,
         )
 
+        forecast_window = first_net_positive
+        if forecast_window is None:
+            forecast_window = len(self.forecast.battery_energy)
+
+        if (
+            battery_empty is None
+            or min(self.forecast.battery_energy[0:first_net_positive])
+            > self.actuals.battery_min_energy * 1.2
+        ):
+            # if battery is not going to be empty (with a safety margin) in the next forecast window, then don't charge
+            return False
+
         # if battery will be charged before we next import power, don't charge
 
         if firstgridimport is None or (
@@ -198,7 +206,7 @@ class Should_i_charge_as_not_enough_solar(baseRule):
         ):
             return False
 
-        blocks = self.forecast.amber_scaled_price[0 : forecast_window - 1]
+        blocks = self.forecast.amber_scaled_price[0:forecast_window]
 
         if len(blocks) < 1:
             return False
