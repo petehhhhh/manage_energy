@@ -282,6 +282,7 @@ class ShouldIChargeforPriceSpike(baseRule):
 
         if (
             self.a.start_high_prices is not None
+            and self.a.start_high_prices > 0
             and len(self.a.max_values) > 0
             and self.actuals.scaled_price + self.a.scaled_min_margin
             < (self.a.max_values[0] * 0.9)

@@ -154,14 +154,12 @@ class Analysis:
 
     def find_first_point_battery_empty(self):
         """Finds the first point the battery is empty"""
-        return next(
-            (
-                i
-                for i, value in enumerate(self.forecasts.battery_energy)
-                if value <= self.actuals.battery_min_energy
-            ),
-            None,
-        )
+
+        for i, value in enumerate(self.forecasts.battery_energy):
+            if value <= self.actuals.battery_min_energy:
+                return i
+
+        return None
 
     def getBatteryWindow(self):
         """Works out when battery is next empty or None if it is not forecast to empty"""

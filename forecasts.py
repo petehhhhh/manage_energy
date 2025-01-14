@@ -37,9 +37,11 @@ class Actuals:
         self.battery_max_energy = self.get_entity_state(
             "sensor.battery1_battery_capacity"
         ) + self.get_entity_state("sensor.battery2_battery_capacity")
-
+        self.battery_reserve = self.get_entity_state("sensor.home_backup_reserve")
         # assume 3% reserve on battery.
-        self.battery_max_usable_energy = self.battery_max_energy * 0.97
+        self.battery_max_usable_energy = self.battery_max_energy * (
+            1 - self.battery_reserve / 100
+        )
 
         self.solar = self.get_entity_state("sensor.home_solar_power")
         self.battery_charge_rate = (
@@ -51,12 +53,12 @@ class Actuals:
         if self.curtailed:
             self.net_energy += self.solar
         self.grid = self.get_entity_state("sensor.home_site_power")
-        self.available_battery_energy = (
-            self.battery_max_energy * self.battery_pct / 100
-        ) - (self.battery_max_energy - self.battery_max_usable_energy)
+
         self.battery_min_energy = (
-            self.battery_max_energy - self.battery_max_usable_energy
+            round((self.battery_max_energy - self.battery_max_usable_energy), 1) + 0.1
         )
+        self.available_battery_energy = self.battery_max_energy * self.battery_pct / 100
+
         self.time = datetime.now()
 
     def get_entity_state(self, entity_id, attribute=None):
