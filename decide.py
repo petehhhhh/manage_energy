@@ -9,7 +9,7 @@ from homeassistant.core import HomeAssistant, StateMachine  # type: ignore
 from homeassistant.components.recorder import get_instance  # type: ignore
 from homeassistant.components.recorder.history import state_changes_during_period  # type: ignore
 from homeassistant.helpers.event import async_track_time_interval, async_call_later  # type: ignore
-from .utils import is_demand_window, safe_max
+from .utils import is_demand_window, safe_max, safe_min
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -180,19 +180,19 @@ class Should_i_charge_as_not_enough_solar(baseRule):
             (
                 i
                 for i, num in enumerate(self.forecast.net[0:forecast_window])
-                if num >= 0
+                if num >= 0 and (battery_empty is None or i > battery_empty)
             ),
             None,
         )
-
         forecast_window = first_net_positive
         if forecast_window is None:
             forecast_window = len(self.forecast.battery_energy)
 
+        min_battery = safe_min(self.forecast.battery_energy[0:first_net_positive])
         if (
             battery_empty is None
-            or min(self.forecast.battery_energy[0:first_net_positive])
-            > self.actuals.battery_min_energy * 1.2
+            or min_battery is None
+            or min_battery > self.actuals.battery_min_energy * 1.2
         ):
             # if battery is not going to be empty (with a safety margin) in the next forecast window, then don't charge
             return False
@@ -267,14 +267,16 @@ class ShouldIDischarge_in_Spike(baseRule):
         if self.a.is_battery_empty():
             return False
 
+        min_value = safe_min(self.a.available_max_values)
         if (
             # This is the time with one of the best prices and has sufficient marging
             self.a.available_max_values is not None
             and len(self.a.available_max_values) > 0
-            and self.actuals.feedin >= 0.9 * min(self.a.available_max_values)
+            and min_value is not None
+            and self.actuals.feedin >= 0.9 * min_value
             and self.a.has_sufficient_margin(
                 self.actuals.feedin,
-                min(self.forecast.amber_price[0 : self.a.battery_window]),
+                safe_min(self.forecast.amber_price[0 : self.a.battery_window]),
             )
         ):
             return True

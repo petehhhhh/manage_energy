@@ -24,12 +24,24 @@ def scale_price_for_demand_window(vtime, val) -> bool:
 
     return val
 
-def safe_max(blocks) :
+
+def safe_max(blocks):
     """checks length and is list so don't get error."""
-    if len(blocks) == 0:
+    if blocks is None or len(blocks) == 0:
         return None
 
     if isinstance(blocks, list):
-        return max (blocks)
-        
+        return max(blocks)
+
+    return blocks
+
+
+def safe_min(blocks):
+    """checks length and is list so don't get error."""
+    if blocks is None or len(blocks) == 0:
+        return None
+
+    if isinstance(blocks, list):
+        return min(blocks)
+
     return blocks
