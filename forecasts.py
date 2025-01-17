@@ -363,9 +363,8 @@ class Forecasts:
         """ "Cycle through forecasts to work through charging rules for the next x hours."""
 
         ff = Forecasts(self.hub)
-        ff.actuals = self.actuals
+        ff.actuals = copy.copy(self.actuals)
         a = ff.actuals
-        backup_actuals = copy.copy(self.actuals)
 
         # initialise actions in forecast as they don't yet exist
         self.action = [None] * len(self.amber_feed_in)
@@ -384,8 +383,6 @@ class Forecasts:
             )
 
             self.update_forecast(ff, i)
-
-        self.actuals = copy.copy(backup_actuals)
 
     def calc_battery_energy(
         self, current_energy, charge_rate, start: datetime, finish: datetime

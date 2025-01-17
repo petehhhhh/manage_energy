@@ -188,8 +188,8 @@ class Should_i_charge_as_not_enough_solar(baseRule):
         if forecast_window is None:
             forecast_window = len(self.forecast.battery_energy)
 
-        if battery_empty is None:
-            # if battery is not going to be empty (with a safety margin) in the next forecast window, then don't charge
+        min_battery = safe_min(self.forecast.battery_energy[:forecast_window])
+        if battery_empty is None or min_battery > (self.actuals.battery_min_energy + 4):
             return False
 
         # if battery will be charged before we next import power, don't charge
