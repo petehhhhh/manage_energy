@@ -365,6 +365,9 @@ class Forecasts:
         ff = Forecasts(self.hub)
         ff.actuals = self.actuals
         a = ff.actuals
+        backup_actuals = copy.copy(self.actuals)
+
+        # initialise actions in forecast as they don't yet exist
         self.action = [None] * len(self.amber_feed_in)
         self.rule = [None] * len(self.amber_feed_in)
 
@@ -382,9 +385,7 @@ class Forecasts:
 
             self.update_forecast(ff, i)
 
-        self.actuals.refresh()
-        self.actuals.rule = Decide(self).Decide_Battery_Action()
-        self.actuals.action = self.actuals.rule.action
+        self.actuals = copy.copy(backup_actuals)
 
     def calc_battery_energy(
         self, current_energy, charge_rate, start: datetime, finish: datetime
