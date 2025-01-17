@@ -191,15 +191,15 @@ class Forecasts:
     def calc_battery_percent(self, battery_energy_level: float) -> int:
         return int(battery_energy_level / self.actuals.battery_max_energy * 100)
 
-    def forecast_battery_and_grid(self, f):
+    def forecast_battery_and_grid(self):
         # current energy in battery is the level of the battery less the unusable energy circa 10%
 
-        battery_energy_level = f.actuals.available_battery_energy
+        battery_energy_level = self.actuals.available_battery_energy
         battery_forecast = []
         pct_forecast = []
         battery_charge_rate_forecast = []
         grid_forecast = []
-        for i, forecast_net_energy in enumerate(f.net):
+        for i, forecast_net_energy in enumerate(self.net):
             # assume battery is charged at 5kw and discharged at 5kw and calc based on net energy upto 5kw for a half hour period ie KWH = KW/2
             battery_charge_rate, grid = self.calc_battery_and_grid(
                 battery_energy_level, forecast_net_energy
@@ -209,12 +209,12 @@ class Forecasts:
 
             battery_charge_rate_forecast.append(battery_charge_rate)
             grid_forecast.append(grid)
-            if i == len(f.net) - 1:
-                end_time = f.start_time[i] + timedelta(minutes=30)
+            if i == len(self.net) - 1:
+                end_time = self.start_time[i] + timedelta(minutes=30)
             else:
-                end_time = f.start_time[i + 1]
+                end_time = self.start_time[i + 1]
             battery_energy_level = self.calc_battery_energy(
-                battery_energy_level, battery_charge_rate, f.start_time[i], end_time
+                battery_energy_level, battery_charge_rate, self.start_time[i], end_time
             )
             battery_pct = self.calc_battery_percent(battery_energy_level)
             pct_forecast.append(battery_pct)
@@ -258,11 +258,12 @@ class Forecasts:
         self.forecast = []
 
         for i, _ in enumerate(self.start_time):
-            if i < len(self.action):
-                action = self.action[i].value
+            if i < len(self.action) and i < len(self.action) - 1:
+                action = self.action[i]
                 rule = self.rule[i].id
             else:
                 action = ""
+                rule = ""
 
             self.forecast.append(
                 {
@@ -347,7 +348,7 @@ class Forecasts:
             self.battery_pct,
             self.battery_charge_rate,
             self.grid,
-        ) = self.forecast_battery_and_grid(self)
+        ) = self.forecast_battery_and_grid()
         self.analysis = Analysis(self, actuals, self.hub)
         self.analysis.analyze_price_peaks()
         self.actuals.rule = Decide(self).Decide_Battery_Action()
@@ -363,7 +364,8 @@ class Forecasts:
         """ "Cycle through forecasts to work through charging rules for the next x hours."""
 
         ff = Forecasts(self.hub)
-        ff.actuals = copy.copy(self.actuals)
+        ff = copy.copy(self)
+
         a = ff.actuals
 
         # initialise actions in forecast as they don't yet exist
@@ -371,8 +373,8 @@ class Forecasts:
         self.rule = [None] * len(self.amber_feed_in)
 
         for i in range(len(self.amber_feed_in)):
-            self.build_fwd_actuals(ff, i)
-            ff = self.build_fwd_forecast(ff, i)
+            ff.build_fwd_actuals()
+            ff.build_fwd_forecast()
             ff.analysis = Analysis(ff, ff.actuals, self.hub)
             ff.analysis.analyze_price_peaks()
             decision = Decide(ff)
@@ -382,7 +384,9 @@ class Forecasts:
                 a.available_battery_energy, a.net_energy, a.action
             )
 
-            self.update_forecast(ff, i)
+            self.update_forecast(ff.actuals, i)
+            if len(ff.start_time) < 2:
+                break
 
     def calc_battery_energy(
         self, current_energy, charge_rate, start: datetime, finish: datetime
@@ -399,10 +403,8 @@ class Forecasts:
 
         return energy
 
-    def update_forecast(self, ff, i):
+    def update_forecast(self, a, i):
         """ "Capture the actual action and values in original forecast."""
-        a: Actuals
-        a = self.actuals
 
         self.battery_charge_rate[i] = a.battery_charge_rate
         self.action[i] = a.action
@@ -412,29 +414,28 @@ class Forecasts:
         self.battery_energy[i] = a.available_battery_energy
         self.battery_pct[i] = a.battery_pct
 
-    def build_fwd_actuals(self, ff, i):
+    def build_fwd_actuals(self):
         """Build actuals for next forecast in spot 0. Assumes actuals contains last actuals."""
         a: Actuals
         a = self.actuals
-        if i == 0:
-            start_time = datetime.now()
-        else:
-            start_time = self.start_time[i - 1]
+
+        start_time = self.start_time[0]
+        end_time = self.start_time[1]
 
         a.available_battery_energy = self.calc_battery_energy(
             a.available_battery_energy,
             a.battery_charge_rate,
             start_time,
-            self.start_time[i],
+            end_time,
         )
         a.battery_pct = self.calc_battery_percent(a.available_battery_energy)
 
-        a.scaled_price = self.amber_scaled_price[i]
-        a.price = self.amber_price[i]
-        a.feedin = self.amber_feed_in[i]
-        a.time = self.start_time[i]
-        a.solar = self.solar[i]
-        a.consumption = self.consumption[i]
+        a.scaled_price = self.amber_scaled_price[0]
+        a.price = self.amber_price[0]
+        a.feedin = self.amber_feed_in[0]
+        a.time = self.start_time[0]
+        a.solar = self.solar[0]
+        a.consumption = self.consumption[0]
         a.net_energy = a.solar - a.consumption
 
         (a.battery_charge_rate, a.grid) = self.calc_battery_and_grid(
@@ -472,23 +473,21 @@ class Forecasts:
 
         return rate
 
-    def build_fwd_forecast(self, ff, i):
+    def build_fwd_forecast(self):
         """Shift forecasts one space to the left to enable eval of rules on next block."""
-
-        ff.amber_feed_in = self.amber_feed_in[i:]
-        ff.amber_scaled_price = self.amber_scaled_price[i:]
-        ff.amber_price = self.amber_price[i:]
-        ff.start_time = self.start_time[i:]
-        ff.solar = self.solar[i:]
-        ff.net = self.net[i:]
-        ff.consumption = ff.consumption[i:]
+        self.amber_feed_in = self.amber_feed_in[1:]
+        self.amber_scaled_price = self.amber_scaled_price[1:]
+        self.amber_price = self.amber_price[1:]
+        self.start_time = self.start_time[1:]
+        self.solar = self.solar[1:]
+        self.net = self.net[1:]
+        self.consumption = self.consumption[1:]
         (
-            ff.battery_energy,
-            ff.battery_pct,
-            ff.battery_charge_rate,
-            ff.grid,
-        ) = self.forecast_battery_and_grid(ff)
-        return ff
+            self.battery_energy,
+            self.battery_pct,
+            self.battery_charge_rate,
+            self.grid,
+        ) = self.forecast_battery_and_grid()
 
     def format_date(self, std1):
         """Converts a date string or datetime to the specified time zone using zoneinfo."""
