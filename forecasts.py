@@ -364,7 +364,8 @@ class Forecasts:
         """ "Cycle through forecasts to work through charging rules for the next x hours."""
 
         ff = Forecasts(self.hub)
-        ff = copy.deepcopy(self)
+        ff = copy.copy(self)
+        ff.actuals = copy.copy(self.actuals)
 
         a = ff.actuals
 
