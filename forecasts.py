@@ -1,6 +1,7 @@
 from .const import (
     BATTERY_DISCHARGE_RATE,
     BATTERY_CHARGE_RATE,
+    MIN_BATTERY_LEVEL,
     PowerSelectOptions,
     TeslaModeSelectOptions,
     DEMAND_SCALE_UP,
@@ -40,7 +41,7 @@ class Actuals:
         self.battery_reserve = self.get_entity_state("sensor.home_backup_reserve")
         # assume 3% reserve on battery.
         self.battery_max_usable_energy = self.battery_max_energy * (
-            1 - self.battery_reserve / 100
+            1 - MIN_BATTERY_LEVEL / 100
         )
 
         self.solar = self.get_entity_state("sensor.home_solar_power")
@@ -55,7 +56,7 @@ class Actuals:
         self.grid = self.get_entity_state("sensor.home_site_power")
 
         self.battery_min_energy = (
-            round((self.battery_max_energy - self.battery_max_usable_energy), 1) + 0.1
+            round((self.battery_max_energy * MIN_BATTERY_LEVEL / 100), 1) + 0.1
         )
         self.available_battery_energy = self.battery_max_energy * self.battery_pct / 100
 
