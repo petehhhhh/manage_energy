@@ -262,8 +262,7 @@ class Forecasts:
                 action = self.action[i]
                 rule = self.rule[i].id
             else:
-                action = ""
-                rule = ""
+                break
 
             self.forecast.append(
                 {
